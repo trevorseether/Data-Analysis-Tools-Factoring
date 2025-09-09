@@ -532,9 +532,13 @@ copia_base = copia_base.merge(garantias,
                              right_on = 'CODIGO SUBASTA',
                              how = 'left')
 
-copia_base.rename(columns={'GARANTIA': 'GARANTIA NEGATIVA'}, inplace=True)
+copia_base.rename(columns = {'GARANTIA': 'GARANTIA NEGATIVA'}, inplace=True)
 
-copia_base[['Subasta', 'GARANTIA NEGATIVA', 'int_pronto_pago']].to_excel(R'C:\Users\Joseph Montoya\Desktop\columna garantía y pronto pago.xlsx', 
+copia_base.rename(columns = {'int_pronto_pago': 'PRONTO PAGO ADMIN (julio 2025 en adelante)'}, inplace = True)
+
+copia_base[['Subasta', 
+            'GARANTIA NEGATIVA', 
+            'PRONTO PAGO ADMIN (julio 2025 en adelante)']].to_excel(R'C:\Users\Joseph Montoya\Desktop\columna garantía y pronto pago.xlsx', 
                                            index = False )
 
 
