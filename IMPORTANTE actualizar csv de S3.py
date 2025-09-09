@@ -70,9 +70,9 @@ df2.to_csv(csv_buffer, index=False, encoding="utf-8-sig")
 s3_key = f"{s3_prefix}ejemplo1.csv" 
 
 # Subir directamente desde el buffer 
-s3.put_object(Bucket=bucket_name, 
-              Key=f"{s3_prefix}ejemplo1.csv", 
-              Body=csv_buffer.getvalue() 
+s3.put_object(Bucket  = bucket_name, 
+              Key     = s3_key, 
+              Body    = csv_buffer.getvalue() 
               )
 
 print(f"✅ Archivo subido a s3://{bucket_name}/{s3_key}")
