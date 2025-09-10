@@ -46,7 +46,7 @@ df_online = df_online[['Subasta',
                        'Fecha_Pago_real',
                        'Interés Bruto pagado a Crowd (Victor E)',
                        'Costo de Financiamiento Liquidado emp(numérico)',
-                       'Interés Moratorio\n15 / 03 en adelante']]
+                       'Interés Moratorio\n15 / 03 en adelante (numérico)']]
 
 
 
@@ -75,7 +75,7 @@ def convertir_a_float(valor):
     return None  # Si no hay número válido, devuelve None
 df_online['Interés Bruto pagado a Crowd (Victor E)(2)'] = df_online['Interés Bruto pagado a Crowd (Victor E)'].apply(convertir_a_float)
 df_online['Costo de Financiamiento Liquidado emp(2)'] = df_online['Costo de Financiamiento Liquidado emp(numérico)'].apply(convertir_a_float)
-df_online['Interés Moratorio\n15 / 03 en adelante(2)'] = df_online['Interés Moratorio\n15 / 03 en adelante'].apply(convertir_a_float)
+df_online['Interés Moratorio\n15 / 03 en adelante(2)'] = df_online['Interés Moratorio\n15 / 03 en adelante (numérico)'].apply(convertir_a_float)
 
 def limpiar_valor_numerico(valor):
     """

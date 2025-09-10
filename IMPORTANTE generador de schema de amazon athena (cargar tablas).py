@@ -8,10 +8,12 @@ Created on Thu Aug 14 15:43:33 2025
 import pandas as pd
 
 df = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/ejemplo1/ejemplo1.xlsx')
-df.to_csv("C:/Users/Joseph Montoya/Desktop/ejemplo1/ejemplo1.csv", sep=",", 
-          index=False, 
-          encoding="utf-8-sig")
 
+df.to_csv("C:/Users/Joseph Montoya/Desktop/ejemplo1/ejemplo1.csv", sep = ",", 
+          index     = False, 
+          encoding  = "utf-8-sig")
+
+#%%%
 df = pd.read_csv(r'C:/Users/Joseph Montoya/Desktop/fac_outs/202507/fac_outstanding_julio_2025.csv',
                  delimiter = ',')
 
