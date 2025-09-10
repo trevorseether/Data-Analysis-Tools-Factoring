@@ -12,7 +12,7 @@ df.to_csv("C:/Users/Joseph Montoya/Desktop/ejemplo1/ejemplo1.csv", sep=",",
           index=False, 
           encoding="utf-8-sig")
 
-df = pd.read_csv(r'C:/Users/Joseph Montoya/Desktop/ejemplo1/ejemplo1.csv',
+df = pd.read_csv(r'C:/Users/Joseph Montoya/Desktop/fac_outs/202507/fac_outstanding_julio_2025.csv',
                  delimiter = ',')
 
 mapping_types = {
@@ -30,7 +30,7 @@ for col, dtype in df.dtypes.astype(str).to_dict().items():
 """
 
 create_table_query = f"""
-CREATE EXTERNAL TABLE prod_datalake_master.ba__ejemplo1
+CREATE EXTERNAL TABLE prod_datalake_master.ba__fact_outstanding_monthly_snapshot
 (
 {temp_schema}
     `_timestamp` TIMESTAMP
@@ -42,7 +42,7 @@ STORED AS INPUTFORMAT
 OUTPUTFORMAT 
   'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat'
 LOCATION
-    's3://prod-datalake-master-730335218320/manual/ba/ejemplo1.parquet'
+    's3://prod-datalake-master-730335218320/manual/ba/fact_outstanding_monthly_snapshot.parquet'
 TBLPROPERTIES (
   'parquet.compression'='snappy'
 )

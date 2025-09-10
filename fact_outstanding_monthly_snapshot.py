@@ -8,6 +8,7 @@ Created on Mon Sep  8 16:40:10 2025
 # =============================================================================
 # fac_outstanding_monthly_snapshot
 # =============================================================================
+
 import pandas as pd
 import boto3
 import json
@@ -112,13 +113,30 @@ print(df_view.shape)
 
 df_view.to_excel(f'fac_outstanding_tiempo_real_{codmes}.xlsx',
                  index = False)
-#%% agregando el mes actual
-df_corte['transfer_date'] = pd.to_datetime(df_corte['transfer_date'])
 
-df_corte = df_corte[ df_corte['transfer_date'] <= eo_mes_anterior ]
+#%% agregando el mes actual
+df_corte['codmes'] = df_corte['codmes'].astype(int)
+df_corte = df_corte[ df_corte['codmes'] < int(codmes) ]
 
 df_view['codmes'] = df_view['codmes'].astype(int)
 df_view  = df_view[ df_view['codmes'] == int(codmes)]
+
+#ASEGURANDO EL ORDENAMIENTO, PUES EXISTEN DIFERENCIAS POR MAYÚSCULAS Y MINÚSCULAS
+columnas = ['code', 'fecha_cierre', 'codmes', 'product_type', 'client_ruc', 'client_name', 'provider_ruc', 'provider_name', 'flag_newclient', 'flag_newprovider', 'transfer_date', 'ANTERIOR_TRANSFER', 'currency_request', 'currency_auctions', 'assigned_financing_rate', 'total_net_amount_pending_payment', 'e_payment_date_original', 'amount_financed', 'terms', 'amount_advance', 'advance_percentage', 'invoice_count', 'amount_of_invoices', 'assigned_name', 'assigned_last_name', 'company_id', 'user_third_party_id', 'client_id', 'provider_id', 'request_id', 'client_payment_id', 'payment_currency', 'payment_date', 'total_amount_paid', 'capital_paid', 'interest_paid', 'guarantee_paid', 'last_status', 'last_paid_date', 'facturas_vencimientos_iguales', 'fecha_confirmada_hubspot', 'max_payment_date_invoices', 'e_payment_date', 'cambio_fecha_vencimiento', 'q_desembolso', 'm_desembolso', 'new_clients', 'recurrent_clients', 'new_providers', 'recurrent_providers', 'remaining_capital', 'remaining_total_amount', 'actual_status', 'flag_excluir', 'dias_atraso', 'm_desembolso_soles', 'remaining_capital_soles', 'amount_financed_soles', 'exchange_rate', 'codmes_transfer', 'PAR1_m', 'PAR15_m', 'PAR30_m', 'PAR60_m', 'PAR90_m', 'PAR120_m', 'PAR180_m', 'PAR360_m', 'PAR1_q', 'PAR15_q', 'PAR30_q', 'PAR60_q', 'PAR90_q', 'PAR120_q', 'PAR180_q', 'PAR360_q', 'q_vigente', 'condoned', 'judicialized', 'rango_dias_atraso', 'rango_duracion', 'PAR1_ms', 'PAR15_ms', 'PAR30_ms', 'PAR60_ms', 'PAR90_ms', 'PAR120_ms', 'PAR180_ms', 'PAR360_ms', 'FLAG_ORIGEN_OPERACION']
+columnas_mayusc = [col.upper() for col in columnas]
+cc = df_corte.columns
+cc = [col.upper() for col in cc]
+cv = df_view.columns
+cv = [col.upper() for col in cv]
+
+df_corte.columns = cc
+df_corte = df_corte[columnas_mayusc]
+
+df_view.columns = cv
+df_view = df_view[columnas_mayusc]
+
+df_corte.columns = columnas
+df_view.columns  = columnas
 
 df_concatenado = pd.concat([df_corte, df_view], ignore_index=True)
 print(df_concatenado.shape)
@@ -151,8 +169,4 @@ s3.put_object(Bucket = bucket_name,
               )
 
 print(f"✅ Archivo subido a s3://{bucket_name}/{s3_key}")
-
-
-
-
 
