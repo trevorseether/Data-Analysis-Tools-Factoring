@@ -126,7 +126,7 @@ df_online = df_online.merge(df_emitidos[['COM. VINCULADO','COMPROBANTE EMITIDO',
 
 del df_online['COM. VINCULADO']
 
-df_online = df_online[     ~pd.isna(df_online['Interés Bruto pagado a Crowd (Victor E)(3)'])  | ~pd.isna(df_online['Costo de Financiamiento Liquidado emp(3)'])  |  ~pd.isna(df_online['Interés Moratorio\n15 / 03 en adelante(3)']) ]
+df_online = df_online[    ~pd.isna(df_online['Interés Bruto pagado a Crowd (Victor E)(3)'])  | ~pd.isna(df_online['Costo de Financiamiento Liquidado emp(3)'])  |  ~pd.isna(df_online['Interés Moratorio\n15 / 03 en adelante(3)']) ]
 
 df_online.to_excel(rf'C:\Users\Joseph Montoya\Desktop\pruebas\ingresos reales {hoy_formateado}.xlsx', index = False)
 

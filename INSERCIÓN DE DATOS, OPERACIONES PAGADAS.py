@@ -23,7 +23,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 #%% lectura de archivo de garantías negativas:
-garantias = pd.read_excel(r'C:/Users/Joseph Montoya/Downloads/04.09.25 - CUADRE DE CAJA.xlsx',
+garantias = pd.read_excel(r'C:/Users/Joseph Montoya/Downloads/13.09.25 - CUADRE DE CAJA.xlsx',
                           sheet_name = 'Desembolso de Garantías')
 garantias = garantias[ ~pd.isna(garantias ['CODIGO SUBASTA']) ]
 garantias = garantias[ ~pd.isna(garantias ['GARANTIA']) ]
