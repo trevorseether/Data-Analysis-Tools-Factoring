@@ -77,9 +77,9 @@ WITH
    , a.client_payment_id
    , (CASE WHEN (amount_paid_exchange_flag = 'usd2pen') THEN COALESCE(round((a.amount * a.distribution_provider_rate), 2), 0) WHEN (amount_paid_exchange_flag = 'pen2usd') THEN COALESCE(round((a.amount / a.distribution_provider_rate), 2), 0) ELSE a.amount END) original_amount_paid
    , a.distribution_provider_currency_distribution currency_distribution
-   , a.distribution_provider_amount_payment_client client_amount_paid
+   , a.amount client_amount_paid
    , (CASE WHEN ((COALESCE(pay_order_businessman_amount, 0) > 0) AND (COALESCE(distribution_provider_igv, 0) > 0)) THEN (COALESCE(a.distribution_provider_INTeres_payment, 0) + COALESCE(distribution_provider_igv, 0)) WHEN ((COALESCE(pay_order_businessman_amount, 0) = 0) AND (COALESCE(distribution_provider_igv, 0) > 0)) THEN (COALESCE(a.distribution_provider_INTeres_payment, 0) + COALESCE(distribution_provider_igv, 0)) WHEN ((COALESCE(a.distribution_provider_INTeres_payment, 0) = 0) AND (COALESCE(a.distribution_provider_amount_capital_payment, 0) = 0) AND COALESCE((guarantee_paid = 0))) THEN a.distribution_provider_INTeres ELSE COALESCE(a.distribution_provider_INTeres_payment, 0) END) interest_paid
-   , (COALESCE(A.distribution_provider_amount_payment_client, 0) - ((COALESCE(A.distribution_provider_INTeres, 0) + COALESCE(a.diff_interest_proforma_interes_total_real, 0)) + COALESCE(a.guarantee_paid, 0))) capital_paid
+   , (COALESCE(A.amount, 0) - ((COALESCE(A.distribution_provider_INTeres, 0) + COALESCE(a.diff_interest_proforma_interes_total_real, 0)) + COALESCE(a.guarantee_paid, 0))) capital_paid
    , (CASE WHEN (guarantee_exchange_flag = 'usd2pen') THEN COALESCE(round((a.guarantee_paid * a.distribution_provider_rate), 2), 0) WHEN (guarantee_exchange_flag = 'pen2usd') THEN COALESCE(round((a.guarantee_paid / a.distribution_provider_rate), 2), 0) ELSE COALESCE(guarantee_paid, 0) END) guarantee_paid
    , CAST(FROM_iso8601_timestamp(REPLACE(SUBSTRING(CAST(a.date AS VARCHAR), 1, 19), ' ', 'T')) AS DATE) payment_date
    , max(CAST(FROM_iso8601_timestamp(REPLACE(SUBSTRING(CAST(a.date AS VARCHAR), 1, 19), ' ', 'T')) AS DATE)) OVER (PARTITION BY b.auction_code) last_paid_date

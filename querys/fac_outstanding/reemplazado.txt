@@ -1,0 +1,4 @@
+reemplazado 
+-por amount el monto pagado total , antes era distribution_provider_amount_payment_client
+-reemplazado fac_auctions por fac_requests
+

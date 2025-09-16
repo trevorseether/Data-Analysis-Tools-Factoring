@@ -9,7 +9,8 @@ import pandas as pd
 
 df = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/ejemplo1/ejemplo1.xlsx')
 
-df.to_csv("C:/Users/Joseph Montoya/Desktop/ejemplo1/ejemplo1.csv", sep = ",", 
+df.to_csv("C:/Users/Joseph Montoya/Desktop/ejemplo1/ejemplo1.csv", 
+          sep = ",", 
           index     = False, 
           encoding  = "utf-8-sig")
 

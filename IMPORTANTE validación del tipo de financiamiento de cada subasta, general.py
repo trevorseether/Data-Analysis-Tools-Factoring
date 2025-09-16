@@ -7,12 +7,12 @@ Created on Mon May 12 16:03:55 2025
 
 import pandas as pd
 from pyathena import connect
+import json
 
 import warnings
 warnings.filterwarnings("ignore")
 
 #%% Credenciales de AmazonAthena
-import json
 with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
     creds = json.load(f)
 
@@ -87,9 +87,7 @@ pivoteado = pivoteado.merge(aux,
                             on = 'CODE',
                             how = 'left')
 
-pivoteado['CROWD'] = pivoteado['CROWD'].fillna(0)
-pivoteado['GESTORA'] = pivoteado['GESTORA'].fillna(0)
-pivoteado['ONBALANCE'] = ['ONBALANCE'].fillna(0)
+pivoteado[['CROWD', 'GESTORA', 'ONBALANCE']] = pivoteado[['CROWD', 'GESTORA', 'ONBALANCE']].fillna(0)
 
 pivoteado['m fin calculado'] = pivoteado['CROWD'] + pivoteado['GESTORA'] + pivoteado['ONBALANCE']
 
@@ -154,7 +152,109 @@ def ONBALANCE(df):
         return 'NO'
 df['fondo ONBALANCE'] = df.apply(ONBALANCE, axis = 1)
 
+#%%
+df.to_excel(r'C:\Users\Joseph Montoya\Desktop\pruebas\tipo financiamiento online.xlsx', index = False)
 
+#%%
+query = '''
+
+select
+    dealname,
+    monto_financiado,
+    fuente_fondeo
+
+from prod_datalake_master.hubspot__deal    
+where pipeline = '14026011'
+and fuente_fondeo is not null
+ 
+'''
+
+'gestora@prestamype.com'
+'factoringfinanzas@prestamype.com'
+
+cursor = conn.cursor()
+cursor.execute(query)
+
+# Obtener los resultados
+resultados = cursor.fetchall()
+
+# Obtener los nombres de las columnas
+column_names = [desc[0] for desc in cursor.description]
+
+# Convertir los resultados a un DataFrame de pandas
+df_fuente_fondeo_hubspot = pd.DataFrame(resultados, columns = column_names)
+
+hubspots = df_fuente_fondeo_hubspot[ ~df_fuente_fondeo_hubspot['dealname'].isin(list(df['CODE'])) ]
+
+#%%%
+hubspots.to_excel(r'C:\Users\Joseph Montoya\Desktop\pruebas\tipo financiamiento hubspot.xlsx', index = False)
+
+#%%%%%%%%%%%%%
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# # # # # #  nueva columna para riesgos
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202507) 13-08-2025.xlsx')
+data['Codigo de Subasta'] = data['Codigo de Subasta'].str.lower()
+
+proporciones = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/tipo fin.xlsx')
+proporciones['CODE'] = proporciones['CODE'].str.lower()
+proporciones = proporciones.drop_duplicates(subset=['CODE'], keep='first')
+data = data[['Codigo de Subasta',
+            'fecha_cierre',
+            'Cierre',
+            
+            'amount_financed',
+            'amount_financed_soles',
+            
+            'remaining_capital',
+            'Saldo Capital soles'
+            ]]
+
+data = data.merge(proporciones,
+                  left_on  = 'Codigo de Subasta',
+                  right_on = 'CODE',
+                  how = 'left')
+
+# data[['CROWD', 'GESTORA', 'ONBALANCE']] = data[['CROWD', 'GESTORA', 'ONBALANCE']].fillna(0)
+data['CROWD']     = data['CROWD'].fillna(0)
+data['GESTORA']   = data['GESTORA'].fillna(0)
+data['ONBALANCE'] = data['ONBALANCE'].fillna(0)
+#data['amount_financed_soles'] = data['amount_financed_soles'].fillna(0)
+
+data['suma'] = data['CROWD'] + data['GESTORA'] + data['ONBALANCE']
+data['suma'] = data['suma'].fillna(0)
+
+import numpy as np
+data['CROWD']  = np.where(data['suma'] == 0,
+                          data['amount_financed_soles'],
+                          data['CROWD'])
+data['suma'] = data['CROWD'] + data['GESTORA'] + data['ONBALANCE']
+
+data['crowd %']      = data['CROWD'] / data['suma']
+data['gestora %']    = data['GESTORA'] / data['suma']
+data['onbalance %']  = data['ONBALANCE'] / data['suma']
+
+data[['crowd %', 'gestora %', 'onbalance %']] = data[['crowd %', 'gestora %', 'onbalance %']].fillna(0)
+
+for columna in ['amount_financed_soles', 'Saldo Capital soles']:
+    data[f'crowd_{columna}']     = data[columna] * data['crowd %']
+    data[f'gestora_{columna}']   = data[columna] * data['gestora %']
+    data[f'onbalance_{columna}'] = data[columna] * data['onbalance %']
+
+#%%
+from datetime import datetime
+hoy_formateado = datetime.today().strftime('%d-%m-%Y')
+data.to_excel(rf'C:\Users\Joseph Montoya\Desktop\pruebas\columnas adicionales {hoy_formateado}.xlsx')
 
 
 

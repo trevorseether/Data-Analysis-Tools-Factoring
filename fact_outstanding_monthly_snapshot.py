@@ -14,9 +14,11 @@ import boto3
 import json
 import io
 import os
-# from datetime import datetime
+from datetime import datetime
 
 from pyathena import connect
+
+hoy_formateado = datetime.today().strftime('%Y-%m-%d')
 
 #%% corte actual
 mes_incorporar = '2025-08-31' # último día del mes, cambiar en cada ejecución
@@ -89,7 +91,7 @@ column_names = [desc[0] for desc in cursor.description]
 
 # Convertir los resultados a un DataFrame de pandas
 df_corte = pd.DataFrame(resultados, columns = column_names)
-
+df_corte.to_excel(f'extraido {hoy_formateado}.xlsx', index = False)
 del df_corte['_timestamp']
 
 print(df_corte.shape)
@@ -111,7 +113,7 @@ column_names = [desc[0] for desc in cursor.description]
 df_view = pd.DataFrame(resultados, columns = column_names)
 print(df_view.shape)
 
-df_view.to_excel(f'fac_outstanding_tiempo_real_{codmes}.xlsx',
+df_view.to_excel(f'fac_outstanding_tiempo_real_{codmes} - {hoy_formateado}.xlsx',
                  index = False)
 
 #%% agregando el mes actual
