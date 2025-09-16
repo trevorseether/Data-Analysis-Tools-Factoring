@@ -40,6 +40,8 @@ col_factura_relacionada = 'COM. VINCULADO'   #'Factura Relacionada'
 col_comprobante_emitido = 'COMPROBANTE EMITIDO'  #'Comprobante Emitido'
 df_emitidos = df_emitidos[~(df_emitidos[col_factura_relacionada].isna() & df_emitidos[col_comprobante_emitido].isna() & df_emitidos['RUC'].isna())]
 
+df_emitidos = df_emitidos[df_emitidos['TIPO DE COMPROBANTE'].str.contains('NOTA DE', na=False)]
+
 #%%
 df_online = df_online[['Subasta',
                        'Comprobante_costo_financiamiento',

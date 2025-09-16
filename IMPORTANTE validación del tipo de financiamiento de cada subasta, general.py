@@ -203,12 +203,21 @@ hubspots.to_excel(r'C:\Users\Joseph Montoya\Desktop\pruebas\tipo financiamiento 
 # =============================================================================
 # =============================================================================
 # =============================================================================
-data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202507) 13-08-2025.xlsx')
+
+# cartera
+data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202508) 16-09-2025.xlsx')
 data['Codigo de Subasta'] = data['Codigo de Subasta'].str.lower()
 
-proporciones = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/tipo fin.xlsx')
+# cosecha propia
+cosecha = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA cosecha factoring (202508) 16-09-2025.xlsx')
+cosecha['Codigo de Subasta'] = cosecha['Codigo de Subasta'].str.lower()
+
+
+proporciones = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/tipo fin 202508.xlsx')
 proporciones['CODE'] = proporciones['CODE'].str.lower()
 proporciones = proporciones.drop_duplicates(subset=['CODE'], keep='first')
+proporciones = proporciones[['CODE', 'CROWD', 'GESTORA', 'ONBALANCE']]
+
 data = data[['Codigo de Subasta',
             'fecha_cierre',
             'Cierre',
@@ -252,10 +261,31 @@ for columna in ['amount_financed_soles', 'Saldo Capital soles']:
     data[f'onbalance_{columna}'] = data[columna] * data['onbalance %']
 
 #%%
+cosecha = cosecha[['Codigo de Subasta']]
+
+sin_dups = data.drop_duplicates(subset = 'Codigo de Subasta')
+
+cosecha = cosecha.merge(sin_dups[['Codigo de Subasta',
+                                  'CROWD',
+                                  'GESTORA',
+                                  'ONBALANCE',
+                                  'suma',
+                                  'crowd %',
+                                  'gestora %',
+                                  'onbalance %',
+                                  'crowd_amount_financed_soles',
+                                  'gestora_amount_financed_soles',
+                                  'onbalance_amount_financed_soles']],
+                        on  = 'Codigo de Subasta',
+                        how = 'left')
+
+#%%
 from datetime import datetime
 hoy_formateado = datetime.today().strftime('%d-%m-%Y')
-data.to_excel(rf'C:\Users\Joseph Montoya\Desktop\pruebas\columnas adicionales {hoy_formateado}.xlsx')
+#data.to_excel(rf'C:\Users\Joseph Montoya\Desktop\pruebas\columnas adicionales {hoy_formateado}.xlsx')
 
-
+with pd.ExcelWriter(rf'C:\Users\Joseph Montoya\Desktop\pruebas\columnas adicionales {hoy_formateado}.xlsx', engine="xlsxwriter") as writer:
+    data.to_excel(writer, sheet_name="portafolio", index=False)
+    cosecha.to_excel(writer, sheet_name="cosecha", index=False)
 
 
