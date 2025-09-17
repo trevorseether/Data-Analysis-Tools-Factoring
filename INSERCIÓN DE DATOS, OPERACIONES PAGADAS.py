@@ -543,3 +543,149 @@ copia_base[['Subasta',
 
 
 
+
+
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# # # # # # # parte de las operaciones offline
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# =============================================================================
+query_offline = ''' 
+
+with capa1 as (   
+SELECT
+hd.tipo_de_operacion,
+    HD.dealname as Codigo_de_Subasta,
+    DS.label_dealstage AS Etapa_del_Negocio, 
+    hd.moneda_del_monto_financiado AS Moneda_del_Monto_Financiado,
+    cast(  hd.fecha_de_desembolso__factoring_ AS date) AS Fecha_Desembolso,
+    CAST((hd.closedate - INTERVAL  '5' HOUR) AS DATE) AS Fecha_venta,
+    hd.fecha_de_pago__factoring_ as Fecha_esperada_pago,
+    hd.monto_financiado as Monto_Financiado,
+    hd.monto_neto_de_facturas__factoring_ as Monto_neto,
+    
+    (CASE 
+        WHEN CAST(REPLACE(REPLACE(hd.tasa_de_financiamiento____, '%', ''), ',', '.') AS DOUBLE) > 6E-1
+            THEN round(CAST(REPLACE(REPLACE(hd.tasa_de_financiamiento____, '%', ''), ',', '.') AS DOUBLE) / 100, 5)
+        ELSE round(CAST(REPLACE(REPLACE(hd.tasa_de_financiamiento____, '%', ''), ',', '.') AS DOUBLE), 5)
+    END) AS Tasa_interes_empresario,
+    
+    round(CAST(REPLACE(REPLACE(hd.tasa_de_venta____, '%', ''), ',', '.') AS DOUBLE) / 100,5) as Tasa_interes_crowd,
+    
+    --'' as Costo_Financiamiento_teorico
+    hd.ruc_proveedor,
+    hd.proveedor as razon_social,
+    '' as Direccion,
+    '' as correo,
+    HT.CLOSED_DATE as Fecha_Pago_real,
+    ht.monto_pagado_facturas as  Monto_pagado_total
+    
+FROM prod_datalake_master.hubspot__deal AS HD
+
+LEFT JOIN prod_datalake_master.ba__pipelines_id AS PID
+ON PID.ID =  HD.pipeline
+
+LEFT JOIN prod_datalake_master.ba__dealstages_id AS DS 
+ON DS.id_dealstage = HD.dealstage
+
+LEFT JOIN (select * from prod_datalake_master.hubspot__ticket WHERE hs_pipeline = '26417284') AS ht
+ON HD.dealname = HT.subject
+
+WHERE PID.LABEL = 'Prestamype - Factoring'
+and ds.label_dealstage not in ( 'Cancelado (Subasta desierta) (Prestamype - Factoring)', 
+                                'Rechazado (Prestamype - Factoring)',
+                                'Generado por Compra (Prestamype - Factoring)',
+                                'Generado por Offline Varios Fondos (Prestamype - Factoring)')
+--and hd.tipo_de_operacion in ('Offline', 'Mixta', 'Ordering')
+and length(hd.dealname) > 10
+
+order by hd.dealname
+), capa2 as (           
+select 
+tipo_de_operacion,
+    Codigo_de_Subasta,
+    Etapa_del_Negocio,
+    Moneda_del_Monto_Financiado,
+    Fecha_Desembolso,
+    Fecha_venta,
+    Fecha_esperada_pago,
+    Monto_Financiado,
+    Monto_neto,
+    Tasa_interes_empresario,
+    Tasa_interes_crowd,
+    
+    (date_diff('day', Fecha_Desembolso, Fecha_esperada_pago)) as dias_dif,
+    
+        round((Monto_Financiado * (
+            pow(1 + Tasa_interes_empresario, date_diff('day', Fecha_Desembolso, Fecha_esperada_pago) / 30.0)
+        ) - Monto_Financiado),2) AS Costo_Financiamiento_teorico,
+        
+        ruc_proveedor,
+        razon_social,
+        Direccion,
+        correo,
+        
+        '' AS Comprobante_Comision_manual,
+        '' AS Comprobante_costo_financiamiento_manual,
+        Fecha_Desembolso AS Fecha_Desembolso_Hubspot,
+        Fecha_Pago_real,
+        
+        Monto_pagado_total as "Monto pagado total",
+        '' as "Estado de cobranza real (manual)",
+        '' as "Interés Bruto pagado a Crowd (manual)",
+        '' as "Costo de Financiamiento cobrado admin",
+        '' AS "Costo de Financiamiento Liquidado emp(numérico)",
+        '' AS "Costo de Financiamiento Liquidado emp(comentarios)",
+        Moneda_del_Monto_Financiado AS "Moneda",
+        ' ' AS "Monto pagado - Monto financiado"
+         
+        
+    FROM capa1
+
+)
+select * from capa2
+
+
+'''
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                    
