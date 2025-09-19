@@ -544,7 +544,7 @@ copia_base[['Subasta',
 
 
 
-
+#%%
 # =============================================================================
 # =============================================================================
 # =============================================================================
@@ -560,6 +560,7 @@ copia_base[['Subasta',
 # =============================================================================
 # =============================================================================
 # =============================================================================
+
 query_offline = ''' 
 
 with capa1 as (   
@@ -585,8 +586,8 @@ hd.tipo_de_operacion,
     --'' as Costo_Financiamiento_teorico
     hd.ruc_proveedor,
     hd.proveedor as razon_social,
-    '' as Direccion,
-    '' as correo,
+    ' ' as Direccion,
+    ' ' as correo,
     HT.CLOSED_DATE as Fecha_Pago_real,
     ht.monto_pagado_facturas as  Monto_pagado_total
     
@@ -624,7 +625,7 @@ tipo_de_operacion,
     Tasa_interes_empresario,
     Tasa_interes_crowd,
     
-    (date_diff('day', Fecha_Desembolso, Fecha_esperada_pago)) as dias_dif,
+    --(date_diff('day', Fecha_Desembolso, Fecha_esperada_pago)) as dias_dif,
     
         round((Monto_Financiado * (
             pow(1 + Tasa_interes_empresario, date_diff('day', Fecha_Desembolso, Fecha_esperada_pago) / 30.0)
@@ -640,8 +641,9 @@ tipo_de_operacion,
         Fecha_Desembolso AS Fecha_Desembolso_Hubspot,
         Fecha_Pago_real,
         
-        Monto_pagado_total as "Monto pagado total",
+        '' as "Monto pagado total (manual)",
         '' as "Estado de cobranza real (manual)",
+        Monto_pagado_total as "Monto pagado total (teórico para validaciones)",
         '' as "Interés Bruto pagado a Crowd (manual)",
         '' as "Costo de Financiamiento cobrado admin",
         '' AS "Costo de Financiamiento Liquidado emp(numérico)",
@@ -657,12 +659,54 @@ select * from capa2
 
 
 '''
+#%%
+import pandas as pd
+# import numpy as np
+# import boto3
+from pyathena import connect
+# import openpyxl
+from openpyxl import load_workbook
+from openpyxl.styles import NamedStyle
+import os
 
+import shutil
+from datetime import datetime
 
+import warnings
+warnings.filterwarnings("ignore")
 
+#%% Credenciales de AmazonAthena
+import json
+with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
+    creds = json.load(f)
 
+conn = connect(
+    aws_access_key_id     = creds["AccessKeyId"],
+    aws_secret_access_key = creds["SecretAccessKey"],
+    aws_session_token     = creds["SessionToken"],
+    s3_staging_dir        = creds["s3_staging_dir"],
+    region_name           = creds["region_name"]
+    
+    )
+#%%%
+cursor = conn.cursor()
+cursor.execute(query_offline)
 
+# Obtener los resultados
+resultados = cursor.fetchall()
 
+# Obtener los nombres de las columnas
+column_names = [desc[0] for desc in cursor.description]
+
+# Convertir los resultados a un DataFrame de pandas
+df_offlines = pd.DataFrame(resultados, columns=column_names)
+
+#%%
+df_offlines.to_excel(r'C:\Users\Joseph Montoya\Desktop\pruebas\gestion de comprobantes offlines.xlsx',
+                     index = False)
+
+#%%
+print('fin')
 
 
 
