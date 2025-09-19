@@ -666,7 +666,7 @@ import pandas as pd
 from pyathena import connect
 # import openpyxl
 from openpyxl import load_workbook
-from openpyxl.styles import NamedStyle
+#from openpyxl.styles import NamedStyle
 import os
 
 import shutil
@@ -701,6 +701,22 @@ column_names = [desc[0] for desc in cursor.description]
 # Convertir los resultados a un DataFrame de pandas
 df_offlines = pd.DataFrame(resultados, columns=column_names)
 
+#%% convertir columnas de tasas, donde la separación es el punto, a coma
+# comprobar si este código es eliminable cuando se automatice la escritura en el google sheet
+
+# Lista de columnas a convertir
+columnas = ['Tasa_interes_empresario', 
+            'Tasa_interes_crowd',
+            'Monto_Financiado',
+            'Monto_neto',
+            'Costo_Financiamiento_teorico',
+            'Monto pagado total (teórico para validaciones)',
+            ]
+
+# Formatear cada columna como texto con coma decimal
+for col in columnas:
+    df_offlines[col] = df_offlines[col].apply(lambda x: f"{x:.5f}".replace('.', ',') if pd.notna(x) else "")
+
 #%%
 df_offlines.to_excel(r'C:\Users\Joseph Montoya\Desktop\pruebas\gestion de comprobantes offlines.xlsx',
                      index = False)
@@ -708,28 +724,4 @@ df_offlines.to_excel(r'C:\Users\Joseph Montoya\Desktop\pruebas\gestion de compro
 #%%
 print('fin')
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                                                                    
+                                                                
