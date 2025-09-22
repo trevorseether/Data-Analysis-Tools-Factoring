@@ -35,6 +35,10 @@ df_individuales_emitidos = pd.read_excel( archivo,
                                          dtype = {'CÓDIGO SOLICITUD' : str,
                                                   'SUBTOTAL' : str})
 
+df_facturas_emitidas = pd.read_excel( archivo,
+                                      sheet_name = 'Facturas masivas',
+                                      dtype = {'RUC' : str})
+
 # eliminación de filas vacías
 col_factura_relacionada = 'COM. VINCULADO'   #'Factura Relacionada'
 col_comprobante_emitido = 'COMPROBANTE EMITIDO'  #'Comprobante Emitido'
@@ -190,6 +194,8 @@ interes_moratorio = interes_moratorio[interes_moratorio['Interés Moratorio\n15 
 # quitar si ya se crearon las facturas para interés moratorio
 interes_moratorio = interes_moratorio[~ interes_moratorio['Subasta'].isin(list(df_individuales_emitidos['CÓDIGO SOLICITUD'])) ]
 interes_moratorio = interes_moratorio[~ interes_moratorio['Subasta'].isin(list(facturas_emitidas['CÓDIGO OPERACIÓN'])) ]
+
+interes_moratorio = interes_moratorio[~ interes_moratorio['Subasta'].isin(list(df_facturas_emitidas['CÓDIGO OPERACIÓN']))] 
 
 if interes_moratorio.shape[0]>0:
     print('se crearán notas por interés moratorio')
