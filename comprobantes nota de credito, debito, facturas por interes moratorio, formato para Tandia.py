@@ -204,7 +204,7 @@ if interes_moratorio.shape[0]>0:
     
     df_int_mo['aux1'] = interes_moratorio['Subasta']
     df_int_mo['Grupo'] = np.arange(1, len(df_int_mo) + 1)
-    df_int_mo['Serie'] = ''
+    df_int_mo['Serie'] = 'F003'
     df_int_mo['Correlativo'] = ''    
     df_int_mo['Fecha de emisión'] = pd.to_datetime(datetime.now()).normalize()
     df_int_mo['Fecha de emisión'] = (df_int_mo['Fecha de emisión'].dt.strftime("%Y-%m-%d").astype("string"))

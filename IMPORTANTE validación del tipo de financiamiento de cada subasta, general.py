@@ -203,13 +203,15 @@ hubspots.to_excel(r'C:\Users\Joseph Montoya\Desktop\pruebas\tipo financiamiento 
 # =============================================================================
 # =============================================================================
 # =============================================================================
+import pandas as pd
+
 
 # cartera
-data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202508) 16-09-2025.xlsx')
+data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202508) 23-09-2025.xlsx')
 data['Codigo de Subasta'] = data['Codigo de Subasta'].str.lower()
 
 # cosecha propia
-cosecha = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA cosecha factoring (202508) 16-09-2025.xlsx')
+cosecha = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA cosecha factoring (202508) 23-09-2025.xlsx')
 cosecha['Codigo de Subasta'] = cosecha['Codigo de Subasta'].str.lower()
 
 
@@ -288,4 +290,5 @@ with pd.ExcelWriter(rf'C:\Users\Joseph Montoya\Desktop\pruebas\columnas adiciona
     data.to_excel(writer, sheet_name="portafolio", index=False)
     cosecha.to_excel(writer, sheet_name="cosecha", index=False)
 
-
+#%%
+print('fin')

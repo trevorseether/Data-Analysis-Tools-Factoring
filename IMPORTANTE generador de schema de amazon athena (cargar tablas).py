@@ -7,9 +7,9 @@ Created on Thu Aug 14 15:43:33 2025
 
 import pandas as pd
 
-df = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/ejemplo1/ejemplo1.xlsx')
+df = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/parchamiento de fac outstanding/fac outst.xlsx')
 
-df.to_csv("C:/Users/Joseph Montoya/Desktop/ejemplo1/ejemplo1.csv", 
+df.to_csv("C:/Users/Joseph Montoya/Desktop/pruebas/parchamiento de fac outstanding/fac outst.csv", 
           sep = ",", 
           index     = False, 
           encoding  = "utf-8-sig")
