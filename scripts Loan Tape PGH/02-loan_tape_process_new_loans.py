@@ -17,7 +17,7 @@ from dateutil.relativedelta import relativedelta
 from unidecode import unidecode
 
 import os
-os.chdir(r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202507 news')
+os.chdir(r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202508 news')
 
 def sum_date(codmes,months):
 
@@ -25,7 +25,7 @@ def sum_date(codmes,months):
     return datetime.strftime(temp,'%Y%m')
 
 #%%
-cierre = '202507'
+cierre = '202508'
 fecha_cierre = pd.to_datetime(cierre, format='%Y%m') + pd.offsets.MonthEnd(0)
 
 from datetime import datetime, timezone, timedelta
@@ -55,7 +55,8 @@ bd_operaciones = bd_operaciones.rename(columns = {'Codigo Prestamo':'loan_id',
                                                   'TIPO DE PRESTAMO ':'loan_type'})
 
 #%%
-bd_empresarios = pd.read_excel(r'G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/archivos/BD_Operaciones.xlsx',sheet_name='Empresarios')
+bd_empresarios = pd.read_excel(r'G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/archivos/BD_Operaciones.xlsx',
+                               sheet_name='Empresarios')
 
 bd_empresarios['Codigo cliente'] = bd_empresarios['Codigo cliente'].str.upper()
 
@@ -135,7 +136,8 @@ data_cambios = tipo_de_cambio.copy()
 data_cambios.sort_values('codmes',ascending=False).head()
 
 #%%
-bd_pagos_read = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/temp/temp_new_loans_202507.xlsx')
+# BD PAGOS
+bd_pagos_read = pd.read_excel(rf'C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/temp/temp_new_loans_{cierre}.xlsx')
 bd_pagos = bd_pagos_read.copy()
 bd_pagos['Codigo Operación'] = bd_pagos['Codigo Operación'].str.upper()
 
@@ -747,7 +749,7 @@ df_aggregate.iloc[:,1] = [len(data_merged['loan_id'].unique() ),
 #%%
 bd_operaciones.query("@fecha_cierre >= `begin_date`").shape[0]
 #%%
-
+print('fin')
 #%%
 
 #%%

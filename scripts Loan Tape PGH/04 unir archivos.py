@@ -14,11 +14,11 @@ peru_tz = timezone(timedelta(hours=-5))
 today_date = datetime.now(peru_tz).strftime('%Y%m%d')
 
 #%%
-cierre = '202507'
-os.chdir(r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202507 existing')
+cierre = '202508'
+os.chdir(rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} existing')
 
-path_new      = r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202507 news'
-path_existing = r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202507 existing'
+path_new      = rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} news'
+path_existing = rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} existing'
 
 #%% lectura de los existings
 lt_ex  = pd.read_excel(path_existing + r'\\' + fr'loans_file_{today_date}_updated.xlsx')

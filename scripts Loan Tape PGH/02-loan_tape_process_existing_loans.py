@@ -15,7 +15,7 @@ from dateutil.relativedelta import relativedelta
 from unidecode import unidecode
 
 import os
-os.chdir(r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202507 existing')
+os.chdir(r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202508 existing')
 
 def sum_date(codmes,months):
 
@@ -23,7 +23,7 @@ def sum_date(codmes,months):
     return datetime.strftime(temp,'%Y%m')
 
 #%%
-cierre = '202507'
+cierre = '202508'
 fecha_cierre = pd.to_datetime(cierre, format='%Y%m') + pd.offsets.MonthEnd(0)
 
 from datetime import datetime, timezone, timedelta
@@ -66,6 +66,7 @@ data_cierres['loan_id'] = data_cierres['loan_id'].str.upper()
 data_cierres['cierre'] = data_cierres['cierre'].astype(int).astype(str)
 data_cierres[data_cierres['contract_id'].isnull()]
 
+data_cierres['cierre'].unique()
 #%%
 data_deals = pd.read_excel(r'G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/archivos/deals.xlsx')
 
@@ -122,6 +123,7 @@ data_deals['tasacion_aprobada_dolares'] = data_deals['tasacion_aprobada_dolares'
 # motivos de prestamo sin tildes
 data_deals['motivo_del_prestamo'] = data_deals['motivo_del_prestamo'].fillna('No hay informacion').apply(unidecode)
 data_deals['motivo_principal_del_prestamo'] = data_deals['motivo_principal_del_prestamo'].fillna('No hay informacion').apply(unidecode)
+
 #%%
 path = r'G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/archivos/tipo_de_cambio.xlsx'
 tipo_de_cambio = pd.read_excel(path, sheet_name = 'tipo_de_cambio')
@@ -131,7 +133,7 @@ data_cambios.sort_values('codmes',ascending=False).head()
 
 #%%
 # BD PAGOS
-bd_pagos_read = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/temp/temp_current_loans_202507.xlsx')
+bd_pagos_read = pd.read_excel(rf'C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/temp/temp_current_loans_{cierre}.xlsx')
 bd_pagos = bd_pagos_read.copy()
 bd_pagos['Codigo Operación'] = bd_pagos['Codigo Operación'].str.upper()
 

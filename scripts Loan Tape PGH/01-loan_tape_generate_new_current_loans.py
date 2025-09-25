@@ -21,7 +21,7 @@ def sum_date(codmes,months):
     temp = datetime.strptime(codmes, '%Y%m') + relativedelta(months=months)
     return datetime.strftime(temp,'%Y%m')
 
-cierre = '202507'
+cierre = '202508'
 fecha_cierre = pd.to_datetime(cierre, format='%Y%m') + pd.offsets.MonthEnd(0)
 
 pd.set_option('display.max_columns', None)
@@ -36,19 +36,23 @@ bd_pagos = pd.read_excel(f'G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5
 bd_pagos['Codigo Operación'] = bd_pagos['Codigo Operación'].str.upper()
  
 # datos del cierre anterior
-bd_pagos_last_cierre = pd.read_excel(f'G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/archivos/cierre_fuentes/202506/BD_Pagos.xlsm',sheet_name='BD PAGOS')
+bd_pagos_last_cierre = pd.read_excel(f'G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/archivos/cierre_fuentes/{cierre}/BD_Pagos.xlsm',
+                                     sheet_name='BD PAGOS')
 bd_pagos_last_cierre['Codigo Operación'] = bd_pagos_last_cierre['Codigo Operación'].str.upper()
 
-#%%
-loanfile_202412 = pd.read_excel('C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/202412_Loan Tape Document For Alt Lenders V3.xlsx', sheet_name='Loans File')
+#%% esto se mantiene sin camios
+loanfile_202412 = pd.read_excel('C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/202412_Loan Tape Document For Alt Lenders V3.xlsx', 
+                                sheet_name='Loans File')
 # loanfile_202412.head(2)
 
 #%%
 #BD PAGOS CONTRATOS FINALIZADOS
-bd_pagos_finalizados = pd.read_excel('C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/BD_PAGOS contratos finalizados - P01004.xlsx',sheet_name='Hoja2')
+bd_pagos_finalizados = pd.read_excel('C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/BD_PAGOS contratos finalizados - P01004.xlsx',
+                                     sheet_name='Hoja2')
 bd_pagos_finalizados['Codigo Operación'] = bd_pagos_finalizados['Codigo Operación'].str.upper()
 
-bd_pagos_finalizados_last_cierre = pd.read_excel('G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/archivos/BD_PAGOS contratos finalizados - P01004.xlsx',sheet_name='Hoja2')
+bd_pagos_finalizados_last_cierre = pd.read_excel('G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/archivos/BD_PAGOS contratos finalizados - P01004.xlsx',
+                                                 sheet_name='Hoja2')
 bd_pagos_finalizados_last_cierre['Codigo Operación'] = bd_pagos_finalizados_last_cierre['Codigo Operación'].str.upper()
 
 #%%
