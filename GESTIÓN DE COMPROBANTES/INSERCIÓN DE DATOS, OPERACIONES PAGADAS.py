@@ -639,7 +639,7 @@ tipo_de_operacion,
         '' AS Comprobante_Comision_manual,
         '' AS Comprobante_costo_financiamiento_manual,
         Fecha_Desembolso AS Fecha_Desembolso_Hubspot,
-        Fecha_Pago_real,
+        Fecha_Cancelacion_real,
         
         '' as "Monto pagado total (manual)",
         '' as "Estado de cobranza real (manual)",

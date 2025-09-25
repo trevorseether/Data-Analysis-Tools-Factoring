@@ -450,11 +450,15 @@ column_names = [desc[0] for desc in cursor.description]
 df_pagos = pd.DataFrame(resultados, columns = column_names)
 
 #%% CÁLCULO DE Aggregate Checks
-count_of_loans         = df.shape[0]
-count_unique_clients   = df['customer_id'].unique().shape[0]
-fully_paid_loans       = df[ df['Status'] == 'CLOSED'].shape[0]
-defaulted_loans_late90 = df[ df['Status'] == 'CLOSED'].shape[0]
+count_of_loans         = df.shape[0] # conteo de operaciones
+count_unique_clients   = df['customer_id'].unique().shape[0] # conteo de distintos clientes
+fully_paid_loans       = df[ df['status'] == 'CLOSED'].shape[0] # conteo de ops 
 
+fecha = pd.to_datetime(str(cierre), format="%Y%m") + pd.offsets.MonthEnd(0)
+defaulted_loans_late90 = df[ (df['status'] == 'CURRENT') & 
+                            ((fecha - pd.to_datetime(df['original_maturity_date'])).dt.days > 90) ].shape[0]
+
+total_repayment = 1
 #%%
 # df_pagos.to_excel(ubi + fr'\Payments File {hoy_formateado}.xlsx',
 #                   index = False,
