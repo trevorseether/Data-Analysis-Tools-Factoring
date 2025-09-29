@@ -288,12 +288,20 @@ del df['collateral_value2']
 del df['collateral_value3']
 
 ###############################################################################
+# Lo conviertes en string y luego a datetime, asumiendo el día 1 del mes
+fecha = pd.to_datetime(str(cierre), format="%Y%m")
+
+# Ahora obtienes el último día del mes
+ultimo_dia = fecha + pd.offsets.MonthEnd(0)
+
 df[['closure_date',
-    'original_maturity_date',
+    'original_maturity_date', 
     'begin_date']] = df[['closure_date',
                          'original_maturity_date',
                          'begin_date']].apply(pd.to_datetime)
-df['days_past_due(colab)'] = ((df['closure_date'] - df['original_maturity_date']).dt.days).apply(lambda x: x if x >= 0 else 0).astype(int)
+
+# df['days_past_due'] = ((df['closure_date'] - df['original_maturity_date'].fillna(ultimo_dia)).dt.days).apply(lambda x: x if x >= 0 else 0).astype(int)
+df['days_past_due'] = ((df['closure_date'] - df['original_maturity_date']).dt.days).apply(lambda x: x if x >= 0 else 0).astype(int)
 
 ###############################################################################
 #%%%% CREACIÓN DE Repayment Schedules File
@@ -485,9 +493,30 @@ df_pagos = pd.DataFrame(resultados, columns = column_names)
 temp_group = df_pagos.groupby('loan_id').agg({'amount':'sum', 'payment_id':'count'}).reset_index()
 temp_group.columns = ['loan_id','amount','n_payments']
 
-temp_indiv = df[['loan_id','begin_date','original_maturity_date','principal_amount','asset_product','interest_rate','status','principal_outstanding','days_past_due']]
-individual = pd.merge(temp_indiv, temp_group, on='loan_id', how='left')
-individual = individual[['loan_id','begin_date','original_maturity_date','principal_amount','asset_product','interest_rate','status','amount','principal_outstanding','n_payments','days_past_due']]
+temp_indiv = df[['loan_id','begin_date','original_maturity_date','principal_amount',
+                 'asset_product','interest_rate','status','principal_outstanding','days_past_due']]
+
+individual = pd.merge(temp_indiv, temp_group, 
+                      on  = 'loan_id', 
+                      how = 'left')
+
+individual = individual[['loan_id','begin_date','original_maturity_date',
+                         'principal_amount','asset_product','interest_rate',
+                         'status','amount','principal_outstanding','n_payments',
+                         'days_past_due']]
+
+# renombre de las columnas
+individual.columns = [ 'loan_id',
+                       'begin_date',
+                       'original_maturity_date',
+                       'principal_amount',
+                       'asset_product',
+                       'interest_rate',
+                       'status',
+                       'Total amount paid to date',
+                       'Principal remaining',
+                       'Number of payments made',
+                       'DPD' ]
 
 #%% CÁLCULO DE Aggregate Checks
 count_of_loans         = df.shape[0] # conteo de operaciones
@@ -526,7 +555,7 @@ with pd.ExcelWriter(
     mode="a",                       # append en vez de sobrescribir
     if_sheet_exists="replace"       # o "new" para crear nueva hoja aunque el nombre coincida
 ) as writer:
-    df.to_excel(writer, sheet_name="Loans File", index=False)
+    df.to_excel(writer, sheet_name="Loans File", index =False)
     df_pagos.to_excel(writer, sheet_name="Payments File", index=False)
     repayments.to_excel(writer, sheet_name="Repayment Schedules File", index=False)
     individual.to_excel(writer, sheet_name="Individual Loan Checks", index=False)
