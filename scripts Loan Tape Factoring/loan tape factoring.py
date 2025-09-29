@@ -44,7 +44,7 @@ conn = connect(
 
 #%%
 
-query = ''' 
+query = f''' 
 ---   factoring_tape_jalfaro
 
 WITH ranked_rows AS (
@@ -53,9 +53,8 @@ WITH ranked_rows AS (
 			PARTITION BY code
 			ORDER BY codmes DESC
 		) AS rn
-	FROM prod_datalake_analytics.fac_outst_unidos_f_desembolso_jmontoya
--- 	where cast(codmes as int) <= 202412
-	where cast(codmes as int) <= 202507
+	FROM prod_datalake_master.ba__fac_outstanding_monthly_snapshot
+	where cast(codmes as int) <= {cierre}
 ), comision_exito as (
     
     select 
@@ -107,12 +106,13 @@ SELECT a.code as loan_id,
 	'FACTORING' as product,
 	a.product_type as asset_product,
 	'' as loan_purpose,
-	date_format(a.transfer_date, '%Y-%m-%d') as begin_date,
+	cast(a.transfer_date as date) as begin_date,
 	'' as maturity_date,
-	date_format(a.e_payment_date, '%Y-%m-%d') as original_maturity_date,
-	a.payment_date as closure_date,
-	date_diff('day', a.transfer_date, a.payment_date ) as "Fecha Pago - Fecha Desembolso",
-	date_diff('day', a.transfer_date, a.e_payment_date ) as "Fecha vencimiento proveedor - Fecha Desembolso",
+	--date_format(a.e_payment_date, '%Y-%m-%d') as original_maturity_date,
+    CAST(a.e_payment_date AS date) AS original_maturity_date,
+	cast(a.payment_date as date) as closure_date,
+	date_diff('day', cast(a.transfer_date as date), cast(a.payment_date as date)) as "Fecha Pago - Fecha Desembolso",
+	date_diff('day', cast(a.transfer_date as date), cast(a.e_payment_date  as date)) as "Fecha vencimiento proveedor - Fecha Desembolso",
 	g.proforma_simulation_currency as currency,
 	a.amount_financed_soles as principal_amount,
 	CASE
@@ -196,7 +196,7 @@ FROM ranked_rows a
 			dias_atraso
 		FROM prod_datalake_analytics.fac_outst_unidos_f_desembolso_jmontoya
 -- 		WHERE codmes = '202412'
-		WHERE codmes = '202507'
+		WHERE codmes = '{cierre}'
 	) b ON a.code = b.code
 	LEFT JOIN prod_datalake_analytics.fac_auctions c ON a.code = c.code
 	LEFT JOIN prod_datalake_analytics.view_fac_user_third_parties d ON a.client_id = d._id
@@ -217,9 +217,6 @@ WHERE rn = 1 --limit 10 16,557
 	)
     -- and a.code = '8GA97sqH'
 ORDER BY a.codmes;
-
-
-
 
 
 '''
@@ -244,13 +241,15 @@ df['original_maturity_date'] = pd.to_datetime(df['original_maturity_date'], form
 import math
 
 def calcular_dias(row):
+    # Aquí todo bien, los 3 están llenos (no vacíos), pero sale nulo cuando el interest_amount es negativo
     dias = (30 * math.log((row['interest_amount'] / row['principal_amount']) + 1)) / math.log(1 + row['interest_rate'])
     return dias
 
 df['dias calc'] = df.apply(calcular_dias, axis=1)
 df['dias calc r0'] = df['dias calc'].round(0)
 
-raro = df[   df['dias calc r0'] < 0]
+raro  = df[  df['dias calc r0'] < 0]
+raro2 = df[  pd.isna(df['dias calc r0']) ]
 
 def ajuste_closure_date(df):
     if not pd.isna(df['closure_date']):
@@ -264,7 +263,7 @@ def ajuste_original_maturity_date(df):
         return df["begin_date"] + pd.to_timedelta(df["dias calc r0"], unit="D")
     else:
         return df['original_maturity_date']
-df['original_maturity_date'] = df.apply(ajuste_closure_date, axis = 1)
+df['original_maturity_date'] = df.apply(ajuste_original_maturity_date, axis = 1)
 
 ###############################################################################
 
@@ -282,6 +281,39 @@ df['Importe a Devo Pro'] = """'=SI(J2="confirming";0;+AB2-AC2)"""
 df['Monto Adelantado'] = df['Monto Adelantado'].astype(float).fillna(0)
 df['principal_amount'] = df['principal_amount'].astype(float).fillna(0)
 df['percentage of advance'] = df['Monto Adelantado'] / df['principal_amount']
+
+#%% ajustes sacados del script de Yovani
+df['collateral_value'] = df['collateral_value2']
+del df['collateral_value2']
+del df['collateral_value3']
+
+###############################################################################
+df[['closure_date',
+    'original_maturity_date',
+    'begin_date']] = df[['closure_date',
+                         'original_maturity_date',
+                         'begin_date']].apply(pd.to_datetime)
+df['days_past_due(colab)'] = ((df['closure_date'] - df['original_maturity_date']).dt.days).apply(lambda x: x if x >= 0 else 0).astype(int)
+
+###############################################################################
+#%%%% CREACIÓN DE Repayment Schedules File
+repayments = df[['loan_id',
+                 'original_maturity_date',
+                 'total_loan_amount',
+                 'principal_amount',
+                 'interest_amount',
+                 'warranty',
+                 'closure_date']]
+                               
+repayments.columns = ['loan_id',
+                      'due_date',
+                      'amount',
+                      'principal_amount',
+                      'interest_amount',
+                      'warranty_amount',
+                      'paid_date']
+
+# repayments.to_excel('./loan_schedules_202506.xlsx', index=False)
 
 #%%
 # df.to_excel(ubi + fr'\Loans File {hoy_formateado}.xlsx', index = False,
@@ -449,6 +481,14 @@ column_names = [desc[0] for desc in cursor.description]
 # Convertir los resultados a un DataFrame de pandas
 df_pagos = pd.DataFrame(resultados, columns = column_names)
 
+#%% creación de hoja Individual Loan Checks
+temp_group = df_pagos.groupby('loan_id').agg({'amount':'sum', 'payment_id':'count'}).reset_index()
+temp_group.columns = ['loan_id','amount','n_payments']
+
+temp_indiv = df[['loan_id','begin_date','original_maturity_date','principal_amount','asset_product','interest_rate','status','principal_outstanding','days_past_due']]
+individual = pd.merge(temp_indiv, temp_group, on='loan_id', how='left')
+individual = individual[['loan_id','begin_date','original_maturity_date','principal_amount','asset_product','interest_rate','status','amount','principal_outstanding','n_payments','days_past_due']]
+
 #%% CÁLCULO DE Aggregate Checks
 count_of_loans         = df.shape[0] # conteo de operaciones
 count_unique_clients   = df['customer_id'].unique().shape[0] # conteo de distintos clientes
@@ -471,13 +511,13 @@ with pd.ExcelWriter(f"{cierre}_Loan Tape Document For Alt Lenders Factoring Mb.x
     df_pagos.to_excel(writer, sheet_name ="Payments File", index=False)
 '''
 
-#%%% copiar columnas de excel ejemplo
+#%%% copiar excel de ejemplo
 ejemplo_original = r'C:/Users/Joseph Montoya/Desktop/loans tape/ejemplo/ejemplo.xlsx'
 destino = f"{cierre}_Loan Tape Document For Alt Lenders Factoring Mb.xlsx"
 
 # Copiar y renombrar al mismo tiempo
 shutil.copy(ejemplo_original, destino)
-print("✅ Archivo copiado y renombrado como 'destino'")
+print(f"✅ Archivo copiado y renombrado como '{destino}'")
 
 #%% Escribir los dataframes en el excel ya existente
 with pd.ExcelWriter(
@@ -488,6 +528,8 @@ with pd.ExcelWriter(
 ) as writer:
     df.to_excel(writer, sheet_name="Loans File", index=False)
     df_pagos.to_excel(writer, sheet_name="Payments File", index=False)
+    repayments.to_excel(writer, sheet_name="Repayment Schedules File", index=False)
+    individual.to_excel(writer, sheet_name="Individual Loan Checks", index=False)
 
 #%%
 print('fin')

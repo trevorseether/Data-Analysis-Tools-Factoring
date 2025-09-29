@@ -15,13 +15,14 @@ import json
 import io
 import os
 from datetime import datetime
+import numpy as np
 
 from pyathena import connect
 
 hoy_formateado = datetime.today().strftime('%Y-%m-%d')
 
 #%% corte actual
-mes_incorporar = '2025-08-31' # último día del mes, cambiar en cada ejecución
+mes_incorporar = '2025-09-30' # último día del mes, cambiar en cada ejecución
 
 path = r'C:/Users/Joseph Montoya/Desktop/fac_outs' # no cambiar
 
@@ -91,7 +92,9 @@ column_names = [desc[0] for desc in cursor.description]
 
 # Convertir los resultados a un DataFrame de pandas
 df_corte = pd.DataFrame(resultados, columns = column_names)
+
 df_corte.to_excel(f'extraido {hoy_formateado}.xlsx', index = False)
+
 del df_corte['_timestamp']
 
 print(df_corte.shape)
@@ -114,7 +117,9 @@ df_view = pd.DataFrame(resultados, columns = column_names)
 print(df_view.shape)
 
 df_view.to_excel(f'fac_outstanding_tiempo_real_{codmes} - {hoy_formateado}.xlsx',
-                 index = False)
+                  index = False)
+
+df_view_completo = df_view.copy()
 
 #%% agregando el mes actual
 df_corte['codmes'] = df_corte['codmes'].astype(int)
@@ -143,14 +148,100 @@ df_view.columns  = columnas
 df_concatenado = pd.concat([df_corte, df_view], ignore_index=True)
 print(df_concatenado.shape)
 
+#%% CONVERTIR COLUMNAS DE FECHAS A UN SOLO FORMATO
+
+df_concatenado["fecha_cierre"] = pd.to_datetime(df_concatenado["fecha_cierre"],  format="mixed")
+df_concatenado["fecha_cierre"] = df_concatenado["fecha_cierre"].dt.strftime("%Y-%m-%d")
+alert = df_concatenado[ df_concatenado["fecha_cierre"].isna() ]
+if alert.shape[0]>0:
+    print('alerta de nulos en fecha_cierre')
+    
+df_concatenado["transfer_date"] = pd.to_datetime(df_concatenado["transfer_date"],  format="mixed")
+df_concatenado["transfer_date"] = df_concatenado["transfer_date"].dt.strftime("%Y-%m-%d")
+alert = df_concatenado[ df_concatenado["transfer_date"].isna() ]
+if alert.shape[0]>0:
+    print('alerta de nulos en transfer_date')    
+    
+df_concatenado["e_payment_date_original"] = pd.to_datetime(df_concatenado["e_payment_date_original"],  format="mixed")
+df_concatenado["e_payment_date_original"] = df_concatenado["e_payment_date_original"].dt.strftime("%Y-%m-%d")
+alert = df_concatenado[ df_concatenado["e_payment_date_original"].isna() ]
+if alert.shape[0]>0:
+    print('alerta de nulos en e_payment_date_original')    
+
+df_concatenado["payment_date"] = pd.to_datetime(df_concatenado["payment_date"],  format="mixed")
+df_concatenado["payment_date"] = df_concatenado["payment_date"].dt.strftime("%Y-%m-%d")
+alert = df_concatenado[ df_concatenado["payment_date"].isna() ]
+
+df_concatenado["e_payment_date"] = pd.to_datetime(df_concatenado["e_payment_date"],  format="mixed")
+df_concatenado["e_payment_date"] = df_concatenado["e_payment_date"].dt.strftime("%Y-%m-%d")
+alert = df_concatenado[ df_concatenado["e_payment_date"].isna() ]
+if alert.shape[0]>0:
+    print('alerta de nulos en e_payment_date')    
+
+#%% obtener ruc del corte más reciente, para unirlo por codigo de subasta, a aquellos casos donde falte ruc
+rucs = df_view_completo[['code', 'client_ruc', 'codmes']]
+rucs = rucs.sort_values(by = 'codmes', ascending = False)
+rucs = rucs.drop_duplicates(subset=['code'], keep="first")
+rucs = rucs[ ~pd.isna(rucs['client_ruc']) ]
+del rucs['codmes']
+rucs.columns = ['code_aux', 'ruc_aux']
+
+df_concatenado = df_concatenado.merge(rucs,
+                                      left_on  = 'code',
+                                      right_on = 'code_aux',
+                                      how      = 'left')
+df_concatenado['client_ruc'] = np.where( ~df_concatenado['ruc_aux'].isnull(),
+                                         df_concatenado['ruc_aux'],
+                                         df_concatenado['client_ruc'] )
+del df_concatenado['code_aux']
+del df_concatenado['ruc_aux']
+
+#%% limpieza de texto del client_ruc y provider_ruc
+col_ruc = 'client_ruc'
+df_concatenado[col_ruc] = (
+    df_concatenado[col_ruc]
+    .astype(str)                 # convierte todo a string
+    .str.replace('.0','', regex=False)  # limpia floats mal guardados
+    .replace('None', pd.NA)      # convierte 'None' a valor nulo real
+)
+vr = df_concatenado[ (df_concatenado[col_ruc] == 'None') | (pd.isna(df_concatenado[col_ruc]))] 
+
+col_ruc = 'provider_ruc'
+df_concatenado[col_ruc] = (
+    df_concatenado[col_ruc]
+    .astype(str)                 # convierte todo a string
+    .str.replace('.0','', regex=False)  # limpia floats mal guardados
+    .replace('None', pd.NA)      # convierte 'None' a valor nulo real
+)
+vr = df_concatenado[ (df_concatenado[col_ruc] == 'None') | (pd.isna(df_concatenado[col_ruc]))] 
+
+#%% parchamiento del nombre del client_ruc
+clientes = df_concatenado[['client_ruc', 'client_name', 'codmes']]
+clientes = clientes.sort_values(by='codmes', ascending=False)
+clientes = clientes.drop_duplicates(subset=['client_ruc'], keep="first")
+clientes = clientes[ ~pd.isna(clientes['client_ruc'])]
+clientes = clientes[ ~pd.isna(clientes['client_name'])]
+clientes.columns = ['client_ruc_aux', 'client_name_aux', 'codmes']
+
+df_concatenado = df_concatenado.merge(clientes[['client_ruc_aux', 'client_name_aux']],
+                                  left_on  = 'client_ruc',
+                                  right_on = 'client_ruc_aux',
+                                  how      = 'left')
+df_concatenado['client_name'] = np.where( ~df_concatenado['client_name_aux'].isnull(),
+                                         df_concatenado['client_name_aux'],
+                                         df_concatenado['client_name'])
+del df_concatenado['client_ruc_aux']
+del df_concatenado['client_name_aux']
+
 #%%
+
 # Cliente de S3
 s3 = boto3.client(
     "s3",
-    aws_access_key_id        = creds["AccessKeyId"],
-    aws_secret_access_key    = creds["SecretAccessKey"],
-    aws_session_token        = creds["SessionToken"],
-    region_name              = creds["region_name"]
+    aws_access_key_id       = creds["AccessKeyId"],
+    aws_secret_access_key   = creds["SecretAccessKey"],
+    aws_session_token       = creds["SessionToken"],
+    region_name             = creds["region_name"]
 )
 
 # ==== CONFIGURACIÓN ==== 

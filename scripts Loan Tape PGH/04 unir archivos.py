@@ -9,10 +9,13 @@ Created on Tue Sep  2 19:01:28 2025
 # =============================================================================
 import pandas as pd
 import os 
+import shutil # para copiar archivos en windows
+
 from datetime import datetime, timezone, timedelta
 peru_tz = timezone(timedelta(hours=-5))
 today_date = datetime.now(peru_tz).strftime('%Y%m%d')
 
+today_date = '20250925'
 #%%
 cierre = '202508'
 os.chdir(rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} existing')
@@ -87,6 +90,7 @@ columnas_loans = [  'loan_id',
 loans = loans[columnas_loans]
 
 #%%
+'''
 # Guardar en un mismo Excel con varias hojas
 with pd.ExcelWriter(f"{cierre}_Loan Tape Document For Alt Lenders_moises_barrueta.xlsx", 
                     engine="xlsxwriter") as writer:
@@ -94,5 +98,37 @@ with pd.ExcelWriter(f"{cierre}_Loan Tape Document For Alt Lenders_moises_barruet
     #individuals.to_excel(writer, sheet_name="Hoja2", index=False)
     repayments.to_excel(writer, sheet_name="Repayment Schedules File", index=False)
     payments.to_excel(writer, sheet_name="Payments File", index=False)
+'''
+#%%% copiar excel de ejemplo
+ejemplo_original = r'C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/ejemplo.xlsx'
+destino = f"{cierre}_Loan Tape Document For Alt Lenders_moises_barrueta.xlsx"
+
+# Copiar y renombrar al mismo tiempo
+shutil.copy(ejemplo_original, destino)
+print(f"✅ Archivo copiado y renombrado como '{destino}'")
+
+#%% Escribir los dataframes en el excel ya existente
+with pd.ExcelWriter(
+    destino,
+    engine="openpyxl",
+    mode="a",                       # append en vez de sobrescribir
+    if_sheet_exists="replace"       # o "new" para crear nueva hoja aunque el nombre coincida
+) as writer:
+    loans.to_excel(writer,       sheet_name="Loans File", index=False)
+    individuals.to_excel(writer, sheet_name="Individual Loan Checks", index=False)
+    repayments.to_excel(writer,  sheet_name="Repayment Schedules File", index=False)
+    payments.to_excel(writer,    sheet_name="Payments File", index=False)
+
+#%%
+print('fin')
+
+
+
+
+
+
+
+
+
 
 

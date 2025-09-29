@@ -588,7 +588,7 @@ hd.tipo_de_operacion,
     hd.proveedor as razon_social,
     ' ' as Direccion,
     ' ' as correo,
-    HT.CLOSED_DATE as Fecha_Pago_real,
+    HT.CLOSED_DATE as fecha_cancelacion_real,
     ht.monto_pagado_facturas as  Monto_pagado_total
     
 FROM prod_datalake_master.hubspot__deal AS HD

@@ -92,6 +92,14 @@ df_facturas_hijas = df_facturas_hijas[ ~pd.isna(df_facturas_hijas['factura_de_la
 
 df = df_facturas_hijas[ ~pd.isna(df_facturas_hijas['interest_proforma_simulation_financing_cost_value']) ]
 
+df = df[ ~df['code'].isin(['dgOrbr8w', 
+                           'xUzKpddU',
+                           'UAt2W4JI',
+                           'tN5KmEdE',
+                           'IUEExsEn',
+                           '9gR9ER8z',
+                           'VvQCylSz'])] # anulaciones ya realizadas
+
 #%% aquí poner filtrado de operaciones que ya se hayan emitido
 
 #%% estructura para Tandia
@@ -135,7 +143,7 @@ df_items['aux2'] = df['interest_proforma_simulation_financing_cost_value']
 
 df_items['Grupo'] = np.arange(1, len(df_items) + 1)
 df_items['Código del item'] = df_items['aux1']
-df_items['Descripción del item'] = 'Ajuste al descuento por operación de Factoring en referencia el Contrato Empresario.'
+df_items['Descripción del item'] = 'Descuento por operación de Factoring en referencia el Contrato Empresario. El descuento es realizado por Factoring Prestamype.'
 df_items['Unidad del item'] = 'ZZ'
 df_items['Cantidad del item'] = '1'
 df_items['Precio del item'] = df_items['aux2'].abs()

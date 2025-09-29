@@ -1,10 +1,31 @@
-CREATE OR REPLACE VIEW "fac_outst_fecha_desembolso_request_jmontoya" AS 
+--CREATE OR REPLACE VIEW "fac_outst_fecha_desembolso_request_jmontoya" AS 
 WITH
   codmes AS (
    SELECT DISTINCT DATE_FORMAT(FROM_unixtime((CAST(json_extract_scalar(_c1, '$.created_at["$date"]') AS BIGINT) / 1000)), '%Y%m') codmes
    FROM
      "prod_datalake_master"."prestamype__fac_auctions"
-) 
+), fechas_desembolso_hubspot as (    
+
+SELECT t.dealname,
+       t.fecha_de_desembolso__factoring_
+FROM (
+    SELECT
+        dealname,
+        fecha_de_desembolso__factoring_,
+        ROW_NUMBER() OVER (
+            PARTITION BY dealname
+            ORDER BY fecha_de_desembolso__factoring_ ASC -- o DESC
+        ) AS rn
+    FROM "prod_datalake_master"."hubspot__deal"
+    WHERE pipeline = '14026011'
+      AND dealstage NOT IN ('14026018', '14026016')
+      AND fecha_de_desembolso__factoring_ IS NOT NULL
+) t
+WHERE t.rn = 1
+
+)
+
+
 , auctions AS (
    SELECT
      b.code
@@ -14,7 +35,10 @@ WITH
    , (CASE WHEN (b.product = 'factoring') THEN b.user_third_party_ruc ELSE b.company_ruc END) client_ruc
    , (CASE WHEN (b.product = 'confirming') THEN b.user_third_party_name ELSE b.company_name END) provider_name
    , (CASE WHEN (b.product = 'confirming') THEN b.user_third_party_ruc ELSE b.company_ruc END) provider_ruc
-   , (CASE WHEN (b.interest_proforma_disbursement_date IS NOT NULL) THEN DATE_ADD('hour', -5, b.interest_proforma_disbursement_date) WHEN (c.fecha_de_desembolso__factoring_ IS NOT NULL) THEN c.fecha_de_desembolso__factoring_ END) transfer_date
+   , (CASE 
+        WHEN (b.interest_proforma_disbursement_date IS NOT NULL) THEN DATE_ADD('hour', -5, b.interest_proforma_disbursement_date) 
+        WHEN (c.fecha_de_desembolso__factoring_ IS NOT NULL) THEN c.fecha_de_desembolso__factoring_ 
+        END) transfer_date
    , DATE_ADD('hour', -5, a.closed_at) ANTERIOR_TRANSFER
    , b.PROFORma_simulation_currency currency_auctions
    , b.currency currency_request
@@ -22,7 +46,7 @@ WITH
    , row_number() OVER (PARTITION BY (CASE WHEN (b.product = 'confirming') THEN b.user_third_party_ruc ELSE b.company_ruc END) ORDER BY a.closed_at ASC) flag_newprovider
    , (CASE WHEN (b.product = 'factoring') THEN a.proforma_start_financing_INTerest_rate ELSE a.proforma_start_simulation_financing_cost_rate END) assigned_financing_rate
    , b.invoice_net_amount total_net_amount_pending_payment
-   , cast(b.proforma_client_payment_date_expected as date) e_payment_date
+   , CAST(b.proforma_client_payment_date_expected AS date) e_payment_date
    , (CASE WHEN (b.product = 'factoring') THEN b.proforma_simulation_financing_total ELSE b.proforma_simulation_financing END) amount_financed
    , (CASE WHEN (b.interest_proforma_simulation_financing_cost_period IS NOT NULL) THEN b.interest_proforma_simulation_financing_cost_period ELSE b.proforma_simulation_financing_cost_period END) terms
    , (CASE WHEN (b.product = 'factoring') THEN b.proforma_simulation_financing_advance ELSE b.invoice_net_amount END) amount_advance
@@ -43,15 +67,10 @@ WITH
         "prod_datalake_analytics"."fac_auctions"
       WHERE (STATUS IN ('confirmed', 'finished'))
    )  a ON (a.request_id = b._id))
-   LEFT JOIN (
-      SELECT DISTINCT
-        dealname
-      , fecha_de_desembolso__factoring_
-      FROM
-        "prod_datalake_master"."hubspot__deal"
-      WHERE ((pipeline = '14026011') AND (NOT (dealstage IN ('14026018', '14026016'))))
-   )  c ON (c.dealname = b.code))
-   WHERE ((NOT (B.STATUS IN ('rejected', 'canceled'))) AND ((b.interest_proforma_disbursement_date IS NOT NULL) OR (c.fecha_de_desembolso__factoring_ IS NOT NULL)))
+   LEFT JOIN (fechas_desembolso_hubspot)  c ON (c.dealname = b.code))
+   
+   WHERE ((NOT (B.STATUS IN ('rejected', 'canceled'))) 
+   AND ((COALESCE(b.interest_proforma_disbursement_date, c.fecha_de_desembolso__factoring_) IS NOT NULL) OR (c.fecha_de_desembolso__factoring_ IS NOT NULL)))
 ) 
 , client_payments_1 AS (
    SELECT
