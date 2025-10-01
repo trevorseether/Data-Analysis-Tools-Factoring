@@ -519,15 +519,32 @@ individual.columns = [ 'loan_id',
                        'DPD' ]
 
 #%% CÁLCULO DE Aggregate Checks
-count_of_loans         = df.shape[0] # conteo de operaciones
-count_unique_clients   = df['customer_id'].unique().shape[0] # conteo de distintos clientes
-fully_paid_loans       = df[ df['status'] == 'CLOSED'].shape[0] # conteo de ops 
+count_of_loans           = df.shape[0] # conteo de operaciones
+count_unique_clients     = df['customer_id'].unique().shape[0] # conteo de distintos clientes
+fully_paid_loans         = df[ df['status'] == 'CLOSED'].shape[0] # conteo de ops 
 
 fecha = pd.to_datetime(str(cierre), format="%Y%m") + pd.offsets.MonthEnd(0)
-defaulted_loans_late90 = df[ (df['status'] == 'CURRENT') & 
+defaulted_loans_late90   = df[ (df['status'] == 'CURRENT') & 
                             ((fecha - pd.to_datetime(df['original_maturity_date'])).dt.days > 90) ].shape[0]
 
-total_repayment = 1
+total_repayment          = individual['Total amount paid to date'].fillna(0).sum()
+total_value_loan         = individual['principal_amount'].fillna(0).sum()
+total_remaining_loan     = individual['Principal remaining'].fillna(0).sum()
+# total_remaining_interest = repayments[pd.isna(repayments['paid_date'])]['interest_amount'].fillna(0).sum()
+total_remaining_interest = df[ df['status'] == 'CURRENT']['interest_amount'].fillna(0).sum()
+
+columnas = ['Count of all loans issued between yyyy-m','Count of all unique clients(Users) assoc',
+            'Count of loans fully paid for loans issu','Count of defaulted loans (late by more t',
+            'Total value of repayments collected for ','Total value of loan principal issued bet',
+            'Total Remaining loan principal on loans ','Total Remaining loan interest on loans i',
+            'Total Value of Discounts for loans issue', 'Total Value of Fees charged for loans is']
+valores = [count_of_loans, count_unique_clients, fully_paid_loans, defaulted_loans_late90, 
+           total_repayment, total_value_loan, total_remaining_loan, total_remaining_interest, 0, 0]
+
+aggregate_checks = pd.DataFrame({
+        "Test Metric" : columnas,
+        "Value as per <Alt Lender>": valores
+})
 #%%
 # df_pagos.to_excel(ubi + fr'\Payments File {hoy_formateado}.xlsx',
 #                   index = False,
@@ -555,10 +572,11 @@ with pd.ExcelWriter(
     mode="a",                       # append en vez de sobrescribir
     if_sheet_exists="replace"       # o "new" para crear nueva hoja aunque el nombre coincida
 ) as writer:
-    df.to_excel(writer, sheet_name="Loans File", index =False)
-    df_pagos.to_excel(writer, sheet_name="Payments File", index=False)
+    df.to_excel(writer,         sheet_name="Loans File",               index =False)
+    individual.to_excel(writer, sheet_name="Individual Loan Checks",   index=False)
+    df_pagos.to_excel(writer,   sheet_name="Payments File",            index=False)
     repayments.to_excel(writer, sheet_name="Repayment Schedules File", index=False)
-    individual.to_excel(writer, sheet_name="Individual Loan Checks", index=False)
+    aggregate_checks.to_excel(writer,sheet_name="agg checks",          index=False)
 
 #%%
 print('fin')

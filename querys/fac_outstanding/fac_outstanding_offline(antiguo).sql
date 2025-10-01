@@ -1,4 +1,4 @@
-CREATE OR REPLACE VIEW "fac_outst_offline_jmontoya" AS 
+--CREATE OR REPLACE VIEW "fac_outst_offline_jmontoya" AS 
 WITH
   cortes_mensuales AS (
    SELECT DATE_ADD('day', -1, DATE_TRUNC('month', DATE_ADD('month', (x + 1), DATE '2021-03-31'))) fecha_eomonth
@@ -65,27 +65,7 @@ WITH
         prod_datalake_master.hubspot__ticket
       WHERE (hs_pipeline = '26417284')
    )  FC2 ON (FC2.SUBJECT = hubspot__deal.dealname))
-   
-   LEFT JOIN prod_datalake_master.ba__dealstages_id as dl on dl.id_dealstage = hubspot__deal.dealstage
-
-   
-WHERE (((((hubspot__deal.pipeline = '14026011') 
-AND length(hubspot__deal.dealname) > 10
-   and dl.label_dealstage not in (  'Cancelado (Subasta desierta) (Prestamype - Factoring)',
-                                    'Rechazado (Prestamype - Factoring)')
-
-   AND COALESCE(hubspot__deal.flag_comprado, '') != 'Si'
-   /*
-   (hubspot__deal.tipo_de_operacion IN ('Offline', 'Mixta')) 
-   AND (((hubspot__deal.dealstage IN ('14026017', '14026015')) AND (hubspot__deal.tipo_de_producto IN ('Factoring', 'Confirming', 'Ordering'))) 
-    OR ((NOT (hubspot__deal.dealstage IN ('14026017', '14026015', '14026018', '14026016'))) AND (hubspot__deal.fecha_de_desembolso__factoring_ IS NOT NULL) 
-   AND (hubspot__deal.tipo_de_producto IN ('Factoring', 'Confirming', 'Ordering'))))) 
-   AND (NOT (hubspot__deal.pipeline IN ('1105313628')))) OR ((pipeline = '14026011') 
-   AND (dealstage IN ('47883049', '14026013', '14026014', '54920842')) 
-   AND (fecha_de_desembolso__factoring_ IS NOT NULL))) 
-   */
-   
-   AND (NOT (hubspot__deal.dealname IN (SELECT dealname
+   WHERE (((((hubspot__deal.pipeline = '14026011') AND (hubspot__deal.tipo_de_operacion IN ('Offline', 'Mixta')) AND (((hubspot__deal.dealstage IN ('14026017', '14026015')) AND (hubspot__deal.tipo_de_producto IN ('Factoring', 'Confirming', 'Ordering'))) OR ((NOT (hubspot__deal.dealstage IN ('14026017', '14026015', '14026018', '14026016'))) AND (hubspot__deal.fecha_de_desembolso__factoring_ IS NOT NULL) AND (hubspot__deal.tipo_de_producto IN ('Factoring', 'Confirming', 'Ordering'))))) AND (NOT (hubspot__deal.pipeline IN ('1105313628')))) OR ((pipeline = '14026011') AND (dealstage IN ('47883049', '14026013', '14026014', '54920842')) AND (fecha_de_desembolso__factoring_ IS NOT NULL))) AND (NOT (hubspot__deal.dealname IN (SELECT dealname
 FROM
   prod_datalake_master.hubspot__deal
 WHERE ((dealstage <> '1115970054') AND (codigo_de_subasta IN (SELECT DISTINCT codigo_de_subasta
@@ -93,8 +73,8 @@ FROM
   prod_datalake_master.hubspot__deal
 WHERE (dealstage = '1115970054')
 )))
-)))
-)))))
+))))
+) 
 , cobranza AS (
    SELECT
      monto_registrado
