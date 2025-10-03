@@ -565,7 +565,8 @@ query_offline = '''
 
 with capa1 as (   
 SELECT
-hd.tipo_de_operacion,
+    hd.tipo_de_producto,
+    hd.tipo_de_operacion,
     HD.dealname as Codigo_de_Subasta,
     DS.label_dealstage AS Etapa_del_Negocio, 
     hd.moneda_del_monto_financiado AS Moneda_del_Monto_Financiado,
@@ -588,7 +589,7 @@ hd.tipo_de_operacion,
     hd.proveedor as razon_social,
     ' ' as Direccion,
     ' ' as correo,
-    HT.CLOSED_DATE as fecha_cancelacion_real,
+    HT.CLOSED_DATE as fecha_pago_real,
     ht.monto_pagado_facturas as  Monto_pagado_total
     
 FROM prod_datalake_master.hubspot__deal AS HD
@@ -613,15 +614,17 @@ and length(hd.dealname) > 10
 order by hd.dealname
 ), capa2 as (           
 select 
-tipo_de_operacion,
+    tipo_de_producto,
     Codigo_de_Subasta,
     Etapa_del_Negocio,
+    tipo_de_operacion,
     Moneda_del_Monto_Financiado,
     Fecha_Desembolso,
     Fecha_venta,
     Fecha_esperada_pago,
-    Monto_Financiado,
+    Fecha_Pago_real,
     Monto_neto,
+    Monto_Financiado,
     Tasa_interes_empresario,
     Tasa_interes_crowd,
     
@@ -639,8 +642,7 @@ tipo_de_operacion,
         '' AS Comprobante_Comision_manual,
         '' AS Comprobante_costo_financiamiento_manual,
         Fecha_Desembolso AS Fecha_Desembolso_Hubspot,
-        Fecha_Cancelacion_real,
-        
+
         '' as "Monto pagado total (manual)",
         '' as "Estado de cobranza real (manual)",
         Monto_pagado_total as "Monto pagado total (teórico para validaciones)",
@@ -674,6 +676,10 @@ from datetime import datetime
 
 import warnings
 warnings.filterwarnings("ignore")
+
+from datetime import datetime, timezone, timedelta
+peru_tz = timezone(timedelta(hours=-5))
+today_date = datetime.now(peru_tz).strftime('%Y%m%d')
 
 #%% Credenciales de AmazonAthena
 import json
@@ -718,7 +724,7 @@ for col in columnas:
     df_offlines[col] = df_offlines[col].apply(lambda x: f"{x:.5f}".replace('.', ',') if pd.notna(x) else "")
 
 #%%
-df_offlines.to_excel(r'C:\Users\Joseph Montoya\Desktop\pruebas\gestion de comprobantes offlines.xlsx',
+df_offlines.to_excel(rf'C:\Users\Joseph Montoya\Desktop\pruebas\gestion de comprobantes offlines {today_date}.xlsx',
                      index = False)
 
 #%%
