@@ -13,6 +13,7 @@ from pyathena import connect
 import json
 import os
 import shutil # para copiar archivos en windows
+import numpy as np
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -20,7 +21,6 @@ warnings.filterwarnings("ignore")
 from datetime import datetime
 hoy_formateado = datetime.today().strftime('%Y-%m-%d')
 
-hoy_formateado = '2025-10-02'
 #%%
 ubi = r'C:\Users\Joseph Montoya\Desktop\loans tape\2025 08'
 
@@ -128,7 +128,7 @@ SELECT a.code as loan_id,
 	
 	'=+AT2' as "Monto Factura",
 	'=+S2'  as "Monto Financiado",
-	'=X2*((1+V2)^(Q2/30)-1)' as "Intereses",
+	'=X2*((1+V2)^(P2/30)-1)' as "Intereses",
 	(CASE WHEN (g.product = 'factoring') THEN g.proforma_simulation_financing_advance ELSE g.invoice_net_amount END) as "Monto Adelantado",
 	'=X2-Z2' AS "FEE Estructutación",
 	'.=SI(J2="confirming";0;T2-Z2-AA2-Y2)' as "GARANTIA",
@@ -158,7 +158,7 @@ SELECT a.code as loan_id,
 		AND currency_auctions = 'PEN' THEN proforma_start_simulation_warranty
 		WHEN currency_auctions = 'USD' THEN proforma_start_simulation_warranty * a.exchange_rate ELSE proforma_end_simulation_warranty
 	END AS warranty,
-	currency_auctions as currency,
+	--currency_auctions as currency,
 	'' as principal_remaining,
 	CASE WHEN a.actual_status = 'vigente' THEN b.remaining_capital_soles 
 	ELSE NULL END as principal_outstanding,
@@ -272,6 +272,9 @@ df["Fecha Pago - Fecha Desembolso"] = (df["closure_date"] - df["begin_date"]).dt
 
 df["Fecha vencimiento proveedor - Fecha Desembolso"] = (df["original_maturity_date"] - df["begin_date"]).dt.days
 
+df["Fecha Pago - Fecha Desembolso"] = np.where(df["Fecha Pago - Fecha Desembolso"].isnull(),
+                                               df["Fecha vencimiento proveedor - Fecha Desembolso"],
+                                               df["Fecha Pago - Fecha Desembolso"])
 del df['dias calc']
 del df['dias calc r0']
 #%% parcheo puntual
@@ -542,15 +545,69 @@ columnas = ['Count of all loans issued between yyyy-m', 'Count of all unique cli
 valores = [count_of_loans, count_unique_clients, fully_paid_loans, defaulted_loans_late90, 
            total_repayment, total_value_loan, total_remaining_loan, total_remaining_interest, 0, 0]
 
+#%% ecuaciones loan tape
+e1 = """.=+CONTARA('Individual Loan Checks'!A:A)"""
+e2 = """.=+CONTARA(UNICOS('Loans File'!B:B))-1"""
+e3 = """.=+CONTAR.SI.CONJUNTO('Loans File'!$H$2:$H$28080;"CLOSED")"""
+e4 = """"""
+e5 = """.=+SUMA('Payments File'!D:D)"""
+e6 = """.=+SUMA('Individual Loan Checks'!D:D)"""
+e7 = """.=+SUMA('Individual Loan Checks'!I:I)"""
+e8 = """.=+SUMAR.SI.CONJUNTO('Loans File'!Y:Y;'Loans File'!H:H;"CURRENT")"""
+e9 = ''
+e10= ''
+
+ecuas = [e1,e2,e3,e4,e5,e6,e7,e8,e9,e10]
+# DATAFRAME DE AGREGATE CHECKS
 aggregate_checks = pd.DataFrame({
         "Test Metric" : columnas,
-        "Value as per <Alt Lender>": valores
+        "Value as per <Alt Lender>": valores,
+        "Ecu" : ecuas
 })
-#%%
-# df_pagos.to_excel(ubi + fr'\Payments File {hoy_formateado}.xlsx',
-#                   index = False,
-#                   sheet_name = 'Payments File')
 
+#%% columna Withholding Amount (Detracción) del Loan File
+df['Withholding Amount (Detracción)'] = df['collateral_value'].fillna(0) - df['total_loan_amount'].fillna(0)
+
+
+#%% columna Financing Percentage
+df['Financing Percentage'] = df['principal_amount'] / df['total_loan_amount']
+
+#%% porcentaje de Avance
+df['Percentage of advance'] = df['Monto Adelantado'] / df['principal_amount']
+
+#%% columnas convertidas al final:
+    
+# columna total_loan_amount (collateral_value - Withholding Amount (Detracción))
+df['total_loan_amount'] = '=+S2-T2'
+
+df['principal_amount']  = '=+V2*U2'
+
+df['Financing Cost']    = '=W2*((1+X2)^(P2/30)-1)'
+
+df['Adavance Amount']   = '=+Z2*W2'
+
+df['Structuring Fee']   = '=W2-AA2'
+
+df['Warranty']          = '.=SI(J2="confirming";0;U2-AA2-AB2-Y2)'
+
+df['Repayment Amount']  = '.=SI(J2="confirming";0;+AC2-Y2)'
+
+df['Success Fee'] = df['FEE Comi Éxito']
+
+df['Withholding Amount (IR)'] = df['Success Fee'].fillna(0)/2
+
+#%% ordenamiento de columnas
+columnas = ['loan_id','customer_id','provider_id','customer_birth_year','customer_gender',
+'customer_sector','branch','status','product','asset_product','loan_purpose',
+'begin_date','maturity_date','original_maturity_date','closure_date','Fecha Pago - Fecha Desembolso',
+'Fecha vencimiento proveedor - Fecha Desembolso','currency','collateral_value','Withholding Amount (Detracción)',
+'total_loan_amount','Financing Percentage','principal_amount','interest_rate','Financing Cost',
+'Percentage of advance','Adavance Amount','Structuring Fee','Warranty','Repayment Amount',
+'Success Fee','Withholding Amount (IR)',' ','interest_period','downpayment','fees',
+'warranty','principal_remaining','principal_outstanding','interest_outstanding',
+'fee_outstanding','penalty_outstanding','days_past_due','collateral_description']
+
+df = df[columnas]
 #%% ESCRIBIR UN SOLO EXCEL
 '''
 with pd.ExcelWriter(f"{cierre}_Loan Tape Document For Alt Lenders Factoring Mb.xlsx", engine="openpyxl") as writer:
@@ -560,7 +617,7 @@ with pd.ExcelWriter(f"{cierre}_Loan Tape Document For Alt Lenders Factoring Mb.x
 
 #%%% copiar excel de ejemplo
 ejemplo_original = r'C:/Users/Joseph Montoya/Desktop/loans tape/ejemplo/ejemplo.xlsx'
-destino = f"{cierre}_Loan Tape Document For Alt Lenders Factoring Mb.xlsx"
+destino = f"{cierre}_Loan Tape Document For Alt Lenders Factoring Mb {hoy_formateado}.xlsx"
 
 # Copiar y renombrar al mismo tiempo
 shutil.copy(ejemplo_original, destino)
@@ -574,10 +631,10 @@ with pd.ExcelWriter(
     if_sheet_exists="replace"       # o "new" para crear nueva hoja aunque el nombre coincida
 ) as writer:
     df.to_excel(writer,         sheet_name="Loans File",               index =False)
-    individual.to_excel(writer, sheet_name="Individual Loan Checks",   index=False)
-    df_pagos.to_excel(writer,   sheet_name="Payments File",            index=False)
-    repayments.to_excel(writer, sheet_name="Repayment Schedules File", index=False)
-    aggregate_checks.to_excel(writer,sheet_name="agg checks",          index=False)
+    individual.to_excel(writer, sheet_name="Individual Loan Checks",   index =False)
+    df_pagos.to_excel(writer,   sheet_name="Payments File",            index =False)
+    repayments.to_excel(writer, sheet_name="Repayment Schedules File", index =False)
+    aggregate_checks.to_excel(writer,sheet_name="agg checks",          index =False)
 
 #%%
 print('fin')

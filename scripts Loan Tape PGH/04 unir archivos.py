@@ -10,12 +10,13 @@ Created on Tue Sep  2 19:01:28 2025
 import pandas as pd
 import os 
 import shutil # para copiar archivos en windows
+import numpy as np
 
 from datetime import datetime, timezone, timedelta
 peru_tz = timezone(timedelta(hours=-5))
 today_date = datetime.now(peru_tz).strftime('%Y%m%d')
 
-today_date = '20250925'
+#today_date = '20250925'
 #%%
 cierre = '202508'
 os.chdir(rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} existing')
@@ -47,6 +48,7 @@ loans['FEE']                = '=+AA2'
 loans['Importe Principal']  = '=+U2-V2'
 loans['Interes']            = '=+AD2'
 loans['Ganancia Total']     = '=+U2+X2'
+loans['interest_outstanding'] = """.=SUMAR.SI.CONJUNTO('Repayment Schedules File'!E:E;'Repayment Schedules File'!A:A;'Loans File'!A2)"""
 
 columnas_loans = [  'loan_id',
                     'customer_id',
@@ -125,6 +127,46 @@ aggregate_checks = pd.DataFrame({
         "Test Metric" : columnas,
         "Value as per <Alt Lender>": valores
 })
+
+#%% AJUSTE CREDIT SITUATION y CURRENCY
+bd_ops = pd.read_excel(r"G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/archivos/BD_Operaciones.xlsx")
+
+bd_ops = bd_ops[['Codigo Prestamo', 'Situación del credito', 'Moneda']]
+bd_ops['Moneda'] = bd_ops['Moneda'].replace({'SOLES': 'PEN', 'DOLARES': 'USD'})
+bd_ops.columns = ['cod_aux', 'situacion_aux', 'moneda_aux']
+
+loans = loans.merge(bd_ops,
+                    left_on = 'loan_id',
+                    right_on = 'cod_aux',
+                    how = 'left')
+
+loans['credit_situation'] = np.where(loans['credit_situation'].isnull(),
+                                     loans['situacion_aux'],
+                                     loans['credit_situation'])
+
+loans['credit_situation'] = np.where((loans['credit_situation'].isnull())  &  (loans['loan_id'].str.contains('NORP2P')),
+                                     'NOR',
+                                     loans['credit_situation'])
+
+loans['credit_situation'] = np.where((loans['credit_situation'].isnull())  &  (loans['loan_id'].str.contains('RENP2P')),
+                                     'REN',
+                                     loans['credit_situation'])
+
+del loans['situacion_aux']
+
+loans['currency'] = np.where(loans['currency'].isnull(),
+                             loans['moneda_aux'],
+                             loans['currency'])
+
+del loans['moneda_aux']
+loans_pen = [    'P02082E01679Y00567NORP2P',
+                 'P03088E01156Y00663NORP2P',
+                 'P02445E01962Y00663NORP2P']
+loans_usd = [    'P03063E01697Y00573RENP2P',
+                 'P02085E01697Y00573NORP2P']
+
+loans.loc[loans['loan_id'].isin(loans_pen), 'currency'] = 'PEN'
+loans.loc[loans['loan_id'].isin(loans_usd), 'currency'] = 'USD'
 
 #%%
 '''

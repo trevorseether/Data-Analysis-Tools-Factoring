@@ -716,6 +716,8 @@ df_individual= individual_merged[['loan_id', 'begin_date', 'maturity_date', 'pri
 print(df_individual.shape)
 df_individual = df_individual[df_individual['loan_id'].isin(bd_pagos_read['Codigo Operación'].unique())]
 print(df_individual.shape)
+
+df_individual.rename(columns = {'maturity_date': 'original_maturity_date'}, inplace = True)
 #%%
 df_individual.to_excel(f'individual_{today_date}_new_loans.xlsx',index=False)
 

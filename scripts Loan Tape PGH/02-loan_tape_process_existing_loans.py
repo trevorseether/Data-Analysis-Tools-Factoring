@@ -29,6 +29,7 @@ fecha_cierre = pd.to_datetime(cierre, format='%Y%m') + pd.offsets.MonthEnd(0)
 from datetime import datetime, timezone, timedelta
 peru_tz = timezone(timedelta(hours=-5))
 today_date = datetime.now(peru_tz).strftime('%Y%m%d')
+
 #%%
 bd_operaciones  = pd.read_excel(r"G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/archivos/BD_Operaciones.xlsx")
 
@@ -714,6 +715,8 @@ individual_merged
 df_individual= individual_merged[['loan_id', 'begin_date', 'maturity_date', 'principal_amount', 'product',
        'interest_rate', 'status', 'Total amount paid to date',
        'Principal remaining', 'Number of payments made', 'DPD']]
+
+df_individual.rename(columns = {'maturity_date': 'original_maturity_date'}, inplace = True)
 #%%
 print(df_individual.shape)
 df_individual = df_individual[df_individual['loan_id'].isin(bd_pagos_read['Codigo Operación'].unique())]
