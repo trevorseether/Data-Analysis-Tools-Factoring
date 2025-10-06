@@ -304,9 +304,15 @@ df[['closure_date',
                          'original_maturity_date',
                          'begin_date']].apply(pd.to_datetime)
 
-# df['days_past_due'] = ((df['closure_date'] - df['original_maturity_date'].fillna(ultimo_dia)).dt.days).apply(lambda x: x if x >= 0 else 0).astype(int)
-df['days_past_due'] = ((df['closure_date'] - df['original_maturity_date']).dt.days).apply(lambda x: x if x >= 0 else 0).astype(int)
+# df['days_past_due'] = ((df['closure_date'] - df['original_maturity_date']).dt.days).apply(lambda x: x if x >= 0 else 0).astype(int)
 
+###############################################################################
+# Lo conviertes en string y luego a datetime, asumiendo el día 1 del mes
+fecha_u = pd.to_datetime(str(cierre), format="%Y%m") + pd.offsets.MonthEnd(0)
+
+df['days_past_due'] = np.where(df['status'] == 'CLOSED',
+                               0,
+                               ((fecha_u - df['original_maturity_date']).dt.days).apply(lambda x: x if x >= 0 else 0).astype(int))
 ###############################################################################
 #%%%% CREACIÓN DE Repayment Schedules File
 repayments = df[['loan_id',
@@ -549,7 +555,7 @@ valores = [count_of_loans, count_unique_clients, fully_paid_loans, defaulted_loa
 e1 = """.=+CONTARA('Individual Loan Checks'!A:A)"""
 e2 = """.=+CONTARA(UNICOS('Loans File'!B:B))-1"""
 e3 = """.=+CONTAR.SI.CONJUNTO('Loans File'!$H$2:$H$28080;"CLOSED")"""
-e4 = """"""
+e4 = """.=CONTAR.SI.CONJUNTO('Loans File'!H:H;"CURRENT";'Loans File'!AQ:AQ;">"&90)"""
 e5 = """.=+SUMA('Payments File'!D:D)"""
 e6 = """.=+SUMA('Individual Loan Checks'!D:D)"""
 e7 = """.=+SUMA('Individual Loan Checks'!I:I)"""
