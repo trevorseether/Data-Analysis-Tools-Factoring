@@ -23,7 +23,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 #%% lectura de archivo de garantías negativas:
-garantias = pd.read_excel(r'C:/Users/Joseph Montoya/Downloads/13.09.25 - CUADRE DE CAJA.xlsx',
+garantias = pd.read_excel(r'C:/Users/Joseph Montoya/Downloads/11.10.25 - CUADRE DE CAJA.xlsx',
                           sheet_name = 'Desembolso de Garantías')
 garantias = garantias[ ~pd.isna(garantias ['CODIGO SUBASTA']) ]
 garantias = garantias[ ~pd.isna(garantias ['GARANTIA']) ]
@@ -345,10 +345,13 @@ df = pd.DataFrame(resultados, columns=column_names)
 
 del df['origen_query']
 
+print('datos obtenidos de Query principal')
+
 duplicados = df[df["Subasta"].duplicated()]
 if duplicados.shape[0] > 0 :
     print('alerta de duplicados')
-    
+
+
 #%%
 #Cambiar todas las columnas de fecha a formato fecha:
 for col in df.filter(like="Fecha").columns:
@@ -524,13 +527,14 @@ if duplicados.shape[0] == 0:
 
     workbook.save(excel)
 
+print('datos insertados en Gestión de Comprobantes')
 #%% columna auxiliar de garantía
 copia_base['Subasta'] = copia_base['Subasta'].str.lower()
 garantias['CODIGO SUBASTA'] = garantias['CODIGO SUBASTA'].str.lower()
 copia_base = copia_base.merge(garantias,
-                             left_on = 'Subasta',
-                             right_on = 'CODIGO SUBASTA',
-                             how = 'left')
+                              left_on  = 'Subasta',
+                              right_on = 'CODIGO SUBASTA',
+                              how      = 'left')
 
 copia_base.rename(columns = {'GARANTIA': 'GARANTIA NEGATIVA'}, inplace=True)
 
@@ -541,8 +545,7 @@ copia_base[['Subasta',
             'PRONTO PAGO ADMIN (julio 2025 en adelante)']].to_excel(R'C:\Users\Joseph Montoya\Desktop\columna garantía y pronto pago.xlsx', 
                                            index = False )
 
-
-
+print('creadas garantías negativas, y ops pronto pago')
 
 #%%
 # =============================================================================
@@ -590,7 +593,8 @@ SELECT
     ' ' as Direccion,
     ' ' as correo,
     HT.CLOSED_DATE as fecha_pago_real,
-    ht.monto_pagado_facturas as  Monto_pagado_total
+    ht.monto_pagado_facturas as  Monto_pagado_total,
+    hd.comision_estructuracion
     
 FROM prod_datalake_master.hubspot__deal AS HD
 
@@ -638,6 +642,7 @@ select
         razon_social,
         Direccion,
         correo,
+        comision_estructuracion,
         
         '' AS Comprobante_Comision_manual,
         '' AS Comprobante_costo_financiamiento_manual,
@@ -661,6 +666,7 @@ select * from capa2
 
 
 '''
+
 #%%
 import pandas as pd
 # import numpy as np
@@ -707,10 +713,13 @@ column_names = [desc[0] for desc in cursor.description]
 # Convertir los resultados a un DataFrame de pandas
 df_offlines = pd.DataFrame(resultados, columns=column_names)
 
+print('query offline ejecutada')
 #%% convertir columnas de tasas, donde la separación es el punto, a coma
 # comprobar si este código es eliminable cuando se automatice la escritura en el google sheet
 
 # Lista de columnas a convertir
+
+'''
 columnas = ['Tasa_interes_empresario', 
             'Tasa_interes_crowd',
             'Monto_Financiado',
@@ -722,11 +731,14 @@ columnas = ['Tasa_interes_empresario',
 # Formatear cada columna como texto con coma decimal
 for col in columnas:
     df_offlines[col] = df_offlines[col].apply(lambda x: f"{x:.5f}".replace('.', ',') if pd.notna(x) else "")
-
+'''
+#%%
+df_offlines = df_offlines.fillna(' ')
 #%%
 df_offlines.to_excel(rf'C:\Users\Joseph Montoya\Desktop\pruebas\gestion de comprobantes offlines {today_date}.xlsx',
                      index = False)
 
+print('excel offline creado')
 #%%
 print('fin')
 

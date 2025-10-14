@@ -32,6 +32,8 @@ now = datetime.utcnow()
 athena_timestamp = now.strftime("%Y-%m-%d %H:%M:%S.000")
 
 df['_timestamp'] = athena_timestamp
+# df['_timestamp'] = pd.to_datetime(df['_timestamp'])
+df['_timestamp'] = df['_timestamp'].astype(str)
 
 mapping_types = {
     'object'          : 'string',
@@ -69,4 +71,5 @@ create_table_query = create_table_query.replace("`_timestamp` string", "`_timest
 
 print(create_table_query)
 
-df_pagos.head()
+
+

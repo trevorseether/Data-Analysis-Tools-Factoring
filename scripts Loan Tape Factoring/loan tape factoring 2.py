@@ -552,7 +552,7 @@ valores = [count_of_loans, count_unique_clients, fully_paid_loans, defaulted_loa
            total_repayment, total_value_loan, total_remaining_loan, total_remaining_interest, 0, 0]
 
 #%% ecuaciones loan tape
-e1 = """.=+CONTARA('Individual Loan Checks'!A:A)"""
+e1 = """.=+CONTARA('Individual Loan Checks'!A:A)-1"""
 e2 = """.=+CONTARA(UNICOS('Loans File'!B:B))-1"""
 e3 = """.=+CONTAR.SI.CONJUNTO('Loans File'!$H$2:$H$28080;"CLOSED")"""
 e4 = """.=CONTAR.SI.CONJUNTO('Loans File'!H:H;"CURRENT";'Loans File'!AQ:AQ;">"&90)"""

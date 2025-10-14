@@ -416,14 +416,25 @@ data_merged.loc[data_merged['status'] == 'CURRENT','amortización_2'] = temp_mer
 data_merged.loc[data_merged['status'] != 'CURRENT','amortización_2'] = np.nan
 
 # Completar total_loan_amount
-temp_merge = pd.merge(bd_pagos, bd_operaciones, on='loan_id', how='left')
+temp_merge = pd.merge(bd_pagos, 
+                      bd_operaciones, 
+                      on='loan_id', 
+                      how='left')
 bd_pagos['TIPO DE PRESTAMO '] = temp_merge['TIPO DE PRESTAMO '].combine_first(temp_merge['loan_type'])
 
-temp_groupby = bd_pagos.sort_values(['loan_id','NRO CUOTAS']).groupby('loan_id').agg({'TIPO DE PRESTAMO ': 'last','Cuota esperada mensual soles': 'sum', 'Saldo por cancelar soles': 'last', 'Amortización esperada original soles': 'last'}).reset_index()
+temp_groupby = bd_pagos.sort_values(['loan_id','NRO CUOTAS']).groupby('loan_id').agg({'TIPO DE PRESTAMO '                   : 'last',
+                                                                                      'Cuota esperada mensual soles'        : 'sum',
+                                                                                      'Saldo por cancelar soles'            : 'last',
+                                                                                      'Amortización esperada original soles': 'last'}).reset_index()
 temp_groupby['total_loan_calculado'] = temp_groupby['Cuota esperada mensual soles'] + temp_groupby['Saldo por cancelar soles'] - temp_groupby['Amortización esperada original soles']
 
 temp_merge = pd.merge(data_merged, temp_groupby, on='loan_id', how='left')
-temp_merge['total_loan_amount2'] = np.where(data_merged['loan_type'].isin(['AMORTIZACION LIBRE', 'CUOTA MIXTA', 'SOLO INTERESES', 'CREDITO PUENTE']), temp_merge['total_loan_calculado'], temp_merge['Cuota esperada mensual soles'])
+temp_merge['total_loan_amount2'] = np.where(data_merged['loan_type'].isin(['AMORTIZACION LIBRE', 
+                                                                           'CUOTA MIXTA', 
+                                                                           'SOLO INTERESES', 
+                                                                           'CREDITO PUENTE']), 
+                                            temp_merge['total_loan_calculado'], 
+                                            temp_merge['Cuota esperada mensual soles'])
 
 data_merged.loc[data_merged['Moneda'] == 'DOLARES','total_loan_amount'] = temp_merge['total_loan_amount2']
 data_merged['total_loan_amount'] = temp_merge['total_loan_amount2']

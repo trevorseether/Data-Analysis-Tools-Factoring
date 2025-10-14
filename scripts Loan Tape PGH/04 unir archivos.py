@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 peru_tz = timezone(timedelta(hours=-5))
 today_date = datetime.now(peru_tz).strftime('%Y%m%d')
 
-#today_date = '20250925'
+today_date = '20251002'
 #%%
 cierre = '202508'
 os.chdir(rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} existing')
@@ -42,13 +42,22 @@ individuals = pd.concat([ind_ex, ind_new], ignore_index=True)
 repayments  = pd.concat([rep_ex, rep_new], ignore_index=True)
 payments    = pd.concat([pay_ex, pay_new], ignore_index=True)
 
+print('archivos concatenados')
+#%% calculando la FEE con un porcentaje
+loans['FEE'] = loans['fees']
+
+loans['principal_amount'] = loans['principal_amount'].round(2)
+
+loans['percent_Fee'] = loans['FEE'].fillna(0) / loans['principal_amount']
+
+loans['FEE'] = """.=REDONDEAR(V2*Q2;2)"""
+
 #%% añadiendo columna en Loans
-loans['Importe Solicitado'] = '=+Q2'
-loans['FEE']                = '=+AA2'
-loans['Importe Principal']  = '=+U2-V2'
-loans['Interes']            = '=+AD2'
-loans['Ganancia Total']     = '=+U2+X2'
-loans['interest_outstanding'] = """.=SUMAR.SI.CONJUNTO('Repayment Schedules File'!E:E;'Repayment Schedules File'!A:A;'Loans File'!A2)"""
+# loans['Importe Solicitado'] = '=+Q2'
+loans['Importe Principal']  = '=+Q2-U2'
+loans['Interes']            = """.=SUMAR.SI.CONJUNTO('Repayment Schedules File'!E:E;'Repayment Schedules File'!A:A;'Loans File'!A2)"""
+loans['Ganancia Total']     = '=+Q2+X2'
+loans['interest_outstanding'] = """.=SI(G2="CLOSED";0;MAX(REDONDEAR(X2-SUMAR.SI.CONJUNTO('Payments File'!F:F;'Payments File'!A:A;'Loans File'!A2);2);0))"""
 
 columnas_loans = [  'loan_id',
                     'customer_id',
@@ -70,19 +79,20 @@ columnas_loans = [  'loan_id',
                     'total_loan_amount',
                     'interest_rate',
                     'interest_period',
-                    'Importe Solicitado',
+                    #'Importe Solicitado',
                     'FEE',
+                    'percent_Fee',
                     'Importe Principal',
                     'Interes',
                     'Ganancia Total',
                     
-                    'downpayment',
-                    'fees',
-                    'principal_remaining',
+                    #'downpayment',
+                    #'fees',
+                    #'principal_remaining',
                     'principal_outstanding',
                     'interest_outstanding',
-                    'fee_outstanding',
-                    'penalty_outstanding',
+                    #'fee_outstanding',
+                    #'penalty_outstanding',
                     'days_past_due',
                     'collateral_description',
                     'collateral_value',
@@ -90,6 +100,20 @@ columnas_loans = [  'loan_id',
                     'renewed_id'
                         ]
 loans = loans[columnas_loans]
+
+#%%
+# Calculando collateral_value vacíos
+collateral_value_rate = 0.2
+tc = 3.535
+loans['collateral_value'] = loans['collateral_value'].fillna( (loans['principal_amount'] * (1/collateral_value_rate))/tc )
+loans['collateral_value'] = loans['collateral_value'].round(2)
+
+#%% CALCULO DE DAYS_PAST_DUE
+fecha_u = pd.to_datetime(str(cierre), format="%Y%m") + pd.offsets.MonthEnd(0)
+
+loans['days_past_due'] = np.where(loans['status'] == 'CLOSED',
+                                  0,
+                                  ((fecha_u - loans['original_maturity_date']).dt.days).apply(lambda x: x if x >= 0 else 0).astype(int))
 
 #%% CÁLCULO DE Aggregate Checks
 count_of_loans           = loans.shape[0] # conteo de operaciones
@@ -123,11 +147,25 @@ columnas = ['Count of all loans issued between yyyy-m','Count of all unique clie
 valores = [count_of_loans, count_unique_clients, fully_paid_loans, defaulted_loans_late90, 
            total_repayment, total_value_loan, total_remaining_loan, total_remaining_interest, 0, 0]
 
+#%% ecuaciones loan tape
+e1 = """.=CONTARA('Loans File'!A:A)-1"""
+e2 = """.=CONTARA(UNICOS('Loans File'!B:B))-1"""
+e3 = """.=+CONTAR.SI.CONJUNTO('Loans File'!G:G;"CLOSED")"""
+e4 = """.=CONTAR.SI.CONJUNTO('Loans File'!G:G;"<>CLOSED";'Loans File'!AB:AB;">"&90)"""
+e5 = """.=SUMA('Individual Loan Checks'!H:H)"""
+e6 = """.=SUMA('Individual Loan Checks'!D:D)"""
+e7 = """.=SUMA('Individual Loan Checks'!I:I)"""
+e8 = """.=SUMAR.SI.CONJUNTO('Loans File'!AA:AA;'Loans File'!G:G;"CURRENT";'Loans File'!AA:AA;">0")"""
+e9 = ''
+e10= ''
+
+ecuas = [e1,e2,e3,e4,e5,e6,e7,e8,e9,e10]
+# DATAFRAME DE AGREGATE CHECKS
 aggregate_checks = pd.DataFrame({
         "Test Metric" : columnas,
-        "Value as per <Alt Lender>": valores
+        "Value as per <Alt Lender>": valores,
+        "Ecu" : ecuas
 })
-
 #%% AJUSTE CREDIT SITUATION y CURRENCY
 bd_ops = pd.read_excel(r"G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/archivos/BD_Operaciones.xlsx")
 
@@ -159,6 +197,8 @@ loans['currency'] = np.where(loans['currency'].isnull(),
                              loans['currency'])
 
 del loans['moneda_aux']
+del loans['cod_aux']
+# Parchamiento puntual
 loans_pen = [    'P02082E01679Y00567NORP2P',
                  'P03088E01156Y00663NORP2P',
                  'P02445E01962Y00663NORP2P']
@@ -167,6 +207,19 @@ loans_usd = [    'P03063E01697Y00573RENP2P',
 
 loans.loc[loans['loan_id'].isin(loans_pen), 'currency'] = 'PEN'
 loans.loc[loans['loan_id'].isin(loans_usd), 'currency'] = 'USD'
+
+#%% Recálculo de total_loan_amount de la tabla Loans File
+int_agrupados = repayments.pivot_table(index   = 'loan_id',
+                                       values  = 'interest_amount',
+                                       aggfunc = 'sum').reset_index()
+int_agrupados.columns = ['loan_id', 'int agrupado aux']
+loans = loans.merge(int_agrupados,
+                    on = 'loan_id',
+                    how = 'left')
+loans['int agrupado aux'] = loans['int agrupado aux'].fillna(0)
+
+loans['total_loan_amount'] = loans['principal_amount'].fillna(0) + loans['int agrupado aux']
+del loans['int agrupado aux']
 
 #%%
 '''
@@ -180,7 +233,7 @@ with pd.ExcelWriter(f"{cierre}_Loan Tape Document For Alt Lenders_moises_barruet
 '''
 #%%% copiar excel de ejemplo
 ejemplo_original = r'C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/ejemplo.xlsx'
-destino = f"{cierre}_Loan Tape Document For Alt Lenders_moises_barrueta.xlsx"
+destino = f"{cierre}_Loan Tape Document For Alt Lenders_moises_barrueta V2.xlsx"
 
 # Copiar y renombrar al mismo tiempo
 shutil.copy(ejemplo_original, destino)

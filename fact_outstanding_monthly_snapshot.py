@@ -123,7 +123,7 @@ df_view_completo = df_view.copy()
 
 #%% agregando el mes actual
 df_corte['codmes'] = df_corte['codmes'].astype(int)
-df_corte = df_corte[ df_corte['codmes'] < int(codmes) ]
+df_corte = df_corte[ df_corte['codmes'] < int(codmes) ] #fitrando el mes actual en caso de que quisieramos añadir datos nuevamente
 
 df_view['codmes'] = df_view['codmes'].astype(int)
 df_view  = df_view[ df_view['codmes'] == int(codmes)]
