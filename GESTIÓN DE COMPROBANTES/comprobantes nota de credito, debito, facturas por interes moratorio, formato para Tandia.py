@@ -158,7 +158,7 @@ df_items['Unidad del item'] = 'ZZ'
 
 df_items['Cantidad del item'] = '1'
 
-df_items['Precio del item'] = filtrado['Saldo por costo de financiamiento cobrado'].abs().round(2)
+df_items['Precio del item'] = round(filtrado['Saldo por costo de financiamiento cobrado'].abs().round(2),2)
 
 df_items['Impuesto'] = 'INA'
     
@@ -222,7 +222,7 @@ if interes_moratorio.shape[0]>0:
     df_int_items['Descripción del item'] = 'Interés moratorio en operación de Factoring en referencia.'
     df_int_items['Unidad del item'] = 'ZZ'
     df_int_items['Cantidad del item'] = '1'
-    df_int_items['Precio del item'] = interes_moratorio['Interés Moratorio\n15 / 03 en adelante (numérico)'].abs().round(2)
+    df_int_items['Precio del item'] = round(interes_moratorio['Interés Moratorio\n15 / 03 en adelante (numérico)'].abs().round(2),2)
     df_int_items['Impuesto'] = 'INA'
     df_int_items['Gratuito'] = 'No'
     df_int_items['ICBPER'] = 'No'

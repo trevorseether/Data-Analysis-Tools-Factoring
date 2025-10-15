@@ -207,15 +207,15 @@ import pandas as pd
 
 
 # cartera
-data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202508) 24-09-2025.xlsx')
+data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202509) 14-10-2025.xlsx')
 data['Codigo de Subasta'] = data['Codigo de Subasta'].str.lower()
 
 # cosecha propia
-cosecha = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA cosecha factoring (202508) 24-09-2025.xlsx')
+cosecha = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA cosecha factoring (202509) 14-10-2025.xlsx')
 cosecha['Codigo de Subasta'] = cosecha['Codigo de Subasta'].str.lower()
 
 
-proporciones = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/tipo fin 202508.xlsx')
+proporciones = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/tipo financiamiento online 202509.xlsx')
 proporciones['CODE'] = proporciones['CODE'].str.lower()
 proporciones = proporciones.drop_duplicates(subset=['CODE'], keep='first')
 proporciones = proporciones[['CODE', 'CROWD', 'GESTORA', 'ONBALANCE']]
@@ -242,6 +242,10 @@ data['GESTORA']   = data['GESTORA'].fillna(0)
 data['ONBALANCE'] = data['ONBALANCE'].fillna(0)
 #data['amount_financed_soles'] = data['amount_financed_soles'].fillna(0)
 
+data['CROWD']     = data['CROWD'].astype(float)
+data['GESTORA']   = data['GESTORA'].astype(float)
+data['ONBALANCE'] = data['ONBALANCE'].astype(float)
+
 data['suma'] = data['CROWD'] + data['GESTORA'] + data['ONBALANCE']
 data['suma'] = data['suma'].fillna(0)
 
@@ -255,7 +259,9 @@ data['crowd %']      = data['CROWD'] / data['suma']
 data['gestora %']    = data['GESTORA'] / data['suma']
 data['onbalance %']  = data['ONBALANCE'] / data['suma']
 
-data[['crowd %', 'gestora %', 'onbalance %']] = data[['crowd %', 'gestora %', 'onbalance %']].fillna(0)
+data['crowd %']     = data['crowd %'].fillna(0)
+data['gestora %']   = data['gestora %'].fillna(0)
+data['onbalance %'] = data['onbalance %'].fillna(0)
 
 for columna in ['amount_financed_soles', 'Saldo Capital soles']:
     data[f'crowd_{columna}']     = data[columna] * data['crowd %']

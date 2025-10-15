@@ -649,10 +649,12 @@ select
         Fecha_Desembolso AS Fecha_Desembolso_Hubspot,
 
         '' as "Monto pagado total (manual)",
+        '' as 
         '' as "Estado de cobranza real (manual)",
         Monto_pagado_total as "Monto pagado total (teórico para validaciones)",
         '' as "Interés Bruto pagado a Crowd (manual)",
-        '' as "Costo de Financiamiento cobrado admin",
+        '' as "Costo de Financiamiento cobrado (manual)",
+        '' as "Costo de Financiamiento cobrado (comentarios)",
         '' AS "Costo de Financiamiento Liquidado emp(numérico)",
         '' AS "Costo de Financiamiento Liquidado emp(comentarios)",
         Moneda_del_Monto_Financiado AS "Moneda",
