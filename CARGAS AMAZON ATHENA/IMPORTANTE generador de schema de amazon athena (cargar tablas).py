@@ -51,7 +51,7 @@ STORED AS INPUTFORMAT
 OUTPUTFORMAT 
   'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat'
 LOCATION
-    's3://prod-datalake-master-730335218320/manual/ba/nombre_csv.parquet'
+    's3://prod-datalake-master-730335218320/manual/ba/{nombre_csv}.parquet'
 TBLPROPERTIES (
   'parquet.compression'='snappy'
 )
