@@ -9,10 +9,10 @@ WITH
 , datos_planos AS (
    SELECT
      hubspot__deal.dealname "Code"
-   , hubspot__deal.proveedor "company_name"
-   , CAST(hubspot__deal.ruc_proveedor AS VARCHAR) "company_ruc"
-   , hubspot__deal.cliente "user_third_party_name"
-   , hubspot__deal.ruc_cliente "user_third_party_ruc"
+   , hubspot__deal.cliente "company_name"
+   , hubspot__deal.ruc_cliente "company_ruc"
+   , hubspot__deal.proveedor "user_third_party_name"
+   , CAST(hubspot__deal.ruc_proveedor AS VARCHAR) "user_third_party_ruc"
    , hubspot__deal.tipo_de_producto "product"
    , ROUND(hubspot__deal.monto_adelanto, 2) "monto_de_adelanto"
    , ROUND(hubspot__deal.monto_financiado, 2) "monto_financiado"
