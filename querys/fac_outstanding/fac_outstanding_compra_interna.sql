@@ -9,10 +9,10 @@ WITH
 , datos_planos AS (
    SELECT
      hubspot__deal.dealname "Code"
-   , hubspot__deal.cliente "company_name"
-   , hubspot__deal.ruc_cliente "company_ruc"
-   , hubspot__deal.proveedor "user_third_party_name"
-   , CAST(hubspot__deal.ruc_proveedor AS VARCHAR) "user_third_party_ruc"
+   , hubspot__deal.proveedor "company_name"
+   , CAST(hubspot__deal.ruc_proveedor AS VARCHAR) "company_ruc"
+   , hubspot__deal.cliente "user_third_party_name"
+   , hubspot__deal.ruc_cliente "user_third_party_ruc"
    , hubspot__deal.tipo_de_producto "product"
    , ROUND(hubspot__deal.monto_adelanto, 2) "monto_de_adelanto"
    , ROUND(hubspot__deal.monto_financiado, 2) "monto_financiado"
@@ -25,8 +25,8 @@ WITH
    , (CASE WHEN (hubspot__deal.fecha_de_pago___confirmado_por_correo IS NOT NULL) THEN hubspot__deal.fecha_de_pago___confirmado_por_correo ELSE hubspot__deal.fecha_de_pago__factoring_ END) "e_payment_date"
    , hubspot__deal.comision_estructuracion "comision_total"
    , round((hubspot__deal.comision_estructuracion * (1 / 1.18E0)), 2) "comision_sin_igv"
-   , CAST(FC2.fecha_de_registro_de_compra AS date) "Fecha_de_desembolso_hub"
-   , ((date_trunc('month', CAST(FC2.fecha_de_registro_de_compra AS date)) + INTERVAL  '1' MONTH) - INTERVAL  '1' DAY) "MES_DESEMBOLSO"
+   , CAST(hubspot__deal.fecha_de_registro_de_compra___compra_operacion AS date) "Fecha_de_desembolso_hub"
+   , ((date_trunc('month', CAST(hubspot__deal.fecha_de_registro_de_compra___compra_operacion AS date)) + INTERVAL  '1' MONTH) - INTERVAL  '1' DAY) "MES_DESEMBOLSO"
    , (CASE WHEN (hubspot__deal.flag_comprado = 'Si') THEN 'COMPRA INTERNA' ELSE 'OP OFFLINE' END) flag_es_offline
    , COALESCE(FC1."Fecha de Cierre Final", FC2.FECHA_PAGO_HUB_TICKETS) "FECHA CANCELACION"
    , ((date_trunc('month', FC2.FECHA_PAGO_HUB_TICKETS) + INTERVAL  '1' MONTH) - INTERVAL  '1' DAY) "MES CANCELACION"
@@ -61,7 +61,7 @@ WITH
         subject
       , closed_date "FECHA_PAGO_HUB_TICKETS"
       , tipo_de_pago
-      , fecha_de_registro_de_compra___compra_operacion "fecha_de_registro_de_compra"
+      --, fecha_de_registro_de_compra___compra_operacion as "fecha_de_registro_de_compra" -- esta columna la han retirado de tickets, y la han movido a Deals
       FROM
         prod_datalake_master.hubspot__ticket
       WHERE ((hs_pipeline = '26417284') AND (subject LIKE '% - %'))

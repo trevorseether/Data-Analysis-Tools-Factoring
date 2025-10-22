@@ -11,6 +11,8 @@ Created on Wed Oct 15 09:59:08 2025
 
 import pandas as pd
 import os
+import numpy as np
+# pd.options.display.date_format = "%Y-%m-%d"
 
 #%%
 fecha_corte = '2025-10-31'
@@ -27,12 +29,19 @@ df_ops = pd.read_excel(r'G:/Mi unidad/BD_Cobranzas.xlsm',
                                     'Interes ganados'             : float,
                                     'Saldo a pagar'               : float,
                                     'Numero de cuenta del cliente': str,
-                                    'Fecha de desembolso'         : str})
+                                    'Fecha de desembolso'         : str,
+                                    'Fecha de finalización'       : str})
 df_ops.columns = (
     df_ops.columns
       .str.strip()              # elimina espacios al inicio/fin
       .str.lower()              # convierte todo a minúsculas
       .str.replace(' ', '_')    # reemplaza espacios por guiones bajos
+      .str.replace('á', 'a')    # reemplaza espacios por guiones bajos
+      .str.replace('é', 'e')    # reemplaza espacios por guiones bajos
+      .str.replace('í', 'i')    # reemplaza espacios por guiones bajos
+      .str.replace('ó', 'o')    # reemplaza espacios por guiones bajos
+      .str.replace('u', 'u')    # reemplaza espacios por guiones bajos
+
                  )
 df_ops['codigo_de_contrato'] = df_ops['codigo_de_contrato'].str.strip()
 df_ops['codigo_de_prestamo'] = df_ops['codigo_de_prestamo'].str.strip()
@@ -40,32 +49,18 @@ df_ops['codigo_de_prestamo'] = df_ops['codigo_de_prestamo'].str.strip()
 ###############################################################################
 bd_pagos = pd.read_excel(r'G:/Mi unidad/BD_Cobranzas.xlsm',
                          sheet_name = 'BD PAGOS',
-                         dtype = {'Numero de documento': str,
-                                  'RUC' : str}
+                         dtype = { 'Numero de documento'       : str,
+                                   'RUC'                       : str,
+                                   'Fecha de pago del cliente' : str}
                          )
 
-#%% Fecha finalización de la operación
+bd_pagos['Monto pagado']       = bd_pagos['Monto pagado'].fillna(0).astype(float)
+bd_pagos['Capital pagado']     = bd_pagos['Capital pagado'].fillna(0).astype(float)
+bd_pagos['Intereses generado'] = bd_pagos['Intereses generado'].fillna(0).astype(float)
+bd_pagos['Monto moratorio']    = bd_pagos['Monto moratorio'].fillna(0).astype(float)
+bd_pagos['Saldo a favor']      = bd_pagos['Saldo a favor'].fillna(0).astype(float)
 
-op_ejemplo    = ['LH-45224519959']
-lista_ejemplo = [pd.Timestamp('2025-09-30')]
-
-cancels = pd.DataFrame({
-    'codigo_de_prestamo': op_ejemplo,
-    'fecha_cancelacion' : lista_ejemplo
-    })
-
-cancels['fecha_cancelacion'] = pd.to_datetime(cancels['fecha_cancelacion'])
-###############################################################################
-
-df_ops = df_ops.merge(cancels,
-                      on  = 'codigo_de_prestamo',
-                      how = 'left')
-
-df_ops.columns
-
-
-print('pendiente finalización de la operación')
-
+bd_pagos['Saldo por cancelar'] = bd_pagos['Saldo por cancelar'].astype(float)
 #%% Parseando fechas de desembolso
 def parse_dates(date_str):
     '''
@@ -80,8 +75,11 @@ def parse_dates(date_str):
 
     '''
     #formatos en los cuales se tratará de convertir a DateTime
-    formatos = ['%d/%m/%Y %H:%M:%S'    ,
+    formatos = ['%d-%m-%Y %H:%M:%S'    ,
+                '%d-%m-%Y'             ,
+                '%d/%m/%Y %H:%M:%S'    ,
                 '%d/%m/%Y'             ,
+                '%Y-%d-%m %H:%M:%S'    ,
                 '%Y%m%d', '%Y-%m-%d'   , 
                 '%Y-%m-%d %H:%M:%S'    , 
                 '%Y/%m/%d %H:%M:%S'    ,
@@ -97,12 +95,48 @@ def parse_dates(date_str):
             pass
     return pd.NaT
 
-df_ops['fecha_de_desembolso'] = df_ops['fecha_de_desembolso'].apply(parse_dates)
+df_ops['fecha_de_desembolso']         = df_ops['fecha_de_desembolso'].apply(parse_dates)
+df_ops['fecha_de_finalizacion']       = df_ops['fecha_de_finalizacion'].apply(parse_dates)
+bd_pagos['Fecha de pago del cliente'] = bd_pagos['Fecha de pago del cliente'].apply(parse_dates)
+
+bd_pagos['Fecha de pago del cliente'][12]
+bd_pagos['Fecha de pago del cliente'] = pd.to_datetime(bd_pagos['Fecha de pago del cliente'])
+
+#%% Fecha finalización de la operación
+# cálculo para validaciones sacando la máxima fecha del BD_PAGOS
+fecha_fin = bd_pagos.pivot_table(values  = 'Fecha de pago del cliente',
+                                 index   = 'Codigo de prestamo',
+                                 aggfunc = 'max').reset_index()
+df_ops = df_ops.merge(fecha_fin,
+                      left_on   = 'codigo_de_prestamo',
+                      right_on  = 'Codigo de prestamo',
+                      how = 'left')
+
+df_ops['fecha_de_finalizacion'] = df_ops['fecha_de_finalizacion'].fillna('')
+df_ops['fecha_de_finalizacion'] = df_ops['fecha_de_finalizacion'].astype(str).str.replace('NaT', '')
+
+df_ops['Fecha de pago del cliente'] = df_ops['Fecha de pago del cliente'].fillna('')
+df_ops['Fecha de pago del cliente'] = df_ops['Fecha de pago del cliente'].astype(str).str.replace('NaT', '')
+
+df_ops['validación fecha de finalizacion'] = np.where(df_ops['fecha_de_finalizacion'] != df_ops['Fecha de pago del cliente'],
+                                                      'alerta',
+                                                      '')
+alerta = df_ops[ df_ops['validación fecha de finalizacion'] == 'alerta' ]
+
+if alerta.shape[0] > 0:
+    print('alerta de casos raros')
+    print(alerta)
+    
+df_ops['fecha_de_finalizacion'] = pd.to_datetime(df_ops['fecha_de_finalizacion'])
+df_ops['Fecha de pago del cliente'] = pd.to_datetime(df_ops['Fecha de pago del cliente'])
+
+######### parchamiento para pruebas ############################
+
 
 #%%
 # Crear una lista de fechas
 fechas = pd.date_range(start = '2025-09-30',  # no tocar este valor
-                       end = fecha_corte, freq = 'M')
+                       end = fecha_corte, freq = 'ME')
 
 # Crear un DataFrame con las fechas
 df_fechas = pd.DataFrame({'Fecha_corte': fechas})
@@ -114,11 +148,14 @@ df_temp = df_fechas.assign(key=1).merge(df_ops.assign(key=1), on='key', how='lef
 
 # Filtrar solo cuando la fecha está entre desembolso y cancelación
 fecha_max = df_temp['Fecha_corte'].max()
+df_temp['fecha_de_finalizacion'] = pd.to_datetime(df_temp['fecha_de_finalizacion'])  # aseguramos tipo datetime
+df_temp['Fecha_corte'] = pd.to_datetime(df_temp['Fecha_corte'])
+df_temp['mes_finalizacion'] = df_temp['fecha_de_finalizacion'].dt.to_period('M').dt.to_timestamp('M')
 
 def col_aux(df):
-    if df['fecha_cancelacion'] == df['Fecha_corte']:
+    if df['mes_finalizacion'] == df['Fecha_corte']:
         return 'finalizado'
-    if df['fecha_cancelacion'] < df['Fecha_corte']:
+    if df['mes_finalizacion'] < df['Fecha_corte']:
         return 'eliminar'
     if df['fecha_de_desembolso'] > df['Fecha_corte']:
         return 'eliminar'
@@ -130,5 +167,49 @@ df_temp['aux col filtrado'] = df_temp.apply(col_aux, axis = 1)
 #%% filtración, las ops solo aparecen desde que son desembolsadas hasta que son finalizadas
 df_temp = df_temp[df_temp['aux col filtrado'] != 'eliminar']
 
-#%%
+#%% Cálculo de capital pagado
+cap_original = bd_pagos.pivot_table(index = 'Codigo de prestamo',
+                                    values = 'Saldo por cancelar',
+                                    aggfunc = 'max').reset_index()
+
+df_o = df_temp[['Fecha_corte', 'codigo_de_prestamo']]
+df_o = df_o.merge(bd_pagos[['Codigo de prestamo', 
+                            'Monto pagado', 
+                            'Capital pagado', 
+                            'Intereses generado', 
+                            'Monto moratorio',
+                            'Saldo a favor',
+                            'Fecha de pago del cliente']],
+                  
+                  left_on = 'codigo_de_prestamo',
+                  right_on = 'Codigo de prestamo',
+                  how = 'left')
+
+df_o = df_o[df_o['Fecha de pago del cliente'] <= df_o['Fecha_corte']]
+# 
+pivot_pagos = df_o.pivot_table(index = ['Fecha_corte', 'codigo_de_prestamo'],
+                               values = ['Monto pagado', 
+                                         'Capital pagado', 
+                                         'Intereses generado', 
+                                         'Monto moratorio',
+                                         'Saldo a favor'],
+                               aggfunc = 'sum').reset_index()
+
+#%% union de columnas al df_temp
+df_temp = df_temp.merge(pivot_pagos,
+                        on = ['Fecha_corte', 'codigo_de_prestamo'],
+                        how = 'left')
+
+df_temp['Codigo de prestamo']      = df_temp['Codigo de prestamo'].str.strip()
+cap_original['Codigo de prestamo'] = cap_original['Codigo de prestamo'].str.strip()
+df_temp = df_temp.merge(cap_original,
+                        on = 'Codigo de prestamo',
+                        how = 'left')
+
+
+
+
+
+
+
 
