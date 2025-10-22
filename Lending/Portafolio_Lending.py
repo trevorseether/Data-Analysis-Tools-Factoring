@@ -60,7 +60,11 @@ bd_pagos['Intereses generado'] = bd_pagos['Intereses generado'].fillna(0).astype
 bd_pagos['Monto moratorio']    = bd_pagos['Monto moratorio'].fillna(0).astype(float)
 bd_pagos['Saldo a favor']      = bd_pagos['Saldo a favor'].fillna(0).astype(float)
 
-bd_pagos['Saldo por cancelar'] = bd_pagos['Saldo por cancelar'].astype(float)
+bd_pagos['Saldo por cancelar'] = bd_pagos['Saldo por cancelar'].fillna(0).astype(float)
+
+bd_pagos = bd_pagos.dropna(subset=['Codigo de prestamo', 'Tipo de persona', 
+                                   'Tipo de documento', 'Numero de documento'])
+
 #%% Parseando fechas de desembolso
 def parse_dates(date_str):
     '''
@@ -130,6 +134,9 @@ if alerta.shape[0] > 0:
 df_ops['fecha_de_finalizacion'] = pd.to_datetime(df_ops['fecha_de_finalizacion'])
 df_ops['Fecha de pago del cliente'] = pd.to_datetime(df_ops['Fecha de pago del cliente'])
 
+del df_ops['Codigo de prestamo']
+del df_ops['validación fecha de finalizacion']
+
 ######### parchamiento para pruebas ############################
 
 
@@ -167,7 +174,7 @@ df_temp['aux col filtrado'] = df_temp.apply(col_aux, axis = 1)
 #%% filtración, las ops solo aparecen desde que son desembolsadas hasta que son finalizadas
 df_temp = df_temp[df_temp['aux col filtrado'] != 'eliminar']
 
-#%% Cálculo de capital pagado
+#%% Agregando columnas agregadas desde el bd_pagos
 cap_original = bd_pagos.pivot_table(index = 'Codigo de prestamo',
                                     values = 'Saldo por cancelar',
                                     aggfunc = 'max').reset_index()
@@ -195,17 +202,39 @@ pivot_pagos = df_o.pivot_table(index = ['Fecha_corte', 'codigo_de_prestamo'],
                                          'Saldo a favor'],
                                aggfunc = 'sum').reset_index()
 
+# rename para ser más entendible
+pivot_pagos.rename(columns = {'Intereses generado': 'Interes pagado',
+                              'Monto moratorio' : 'Interes moratorio pagado'},
+                   inplace = True)
+
+
+
 #%% union de columnas al df_temp
 df_temp = df_temp.merge(pivot_pagos,
                         on = ['Fecha_corte', 'codigo_de_prestamo'],
                         how = 'left')
 
-df_temp['Codigo de prestamo']      = df_temp['Codigo de prestamo'].str.strip()
+df_temp['codigo_de_prestamo']      = df_temp['codigo_de_prestamo'].str.strip()
 cap_original['Codigo de prestamo'] = cap_original['Codigo de prestamo'].str.strip()
 df_temp = df_temp.merge(cap_original,
-                        on = 'Codigo de prestamo',
-                        how = 'left')
+                        left_on  = 'codigo_de_prestamo',
+                        right_on = 'Codigo de prestamo',
+                        how      = 'left')
 
+df_temp['Monto pagado']             = df_temp['Monto pagado'].fillna(0)
+df_temp['Capital pagado']           = df_temp['Capital pagado'].fillna(0)
+df_temp['Interes pagado']           = df_temp['Interes pagado'].fillna(0)
+df_temp['Interes moratorio pagado'] = df_temp['Interes moratorio pagado'].fillna(0)
+df_temp['Saldo a favor']            = df_temp['Saldo a favor'].fillna(0)
+
+del df_temp['Codigo de prestamo']
+#%% cálculo de saldo capital
+df_temp['Saldo Capital'] = np.where(df_temp['aux col filtrado'] == 'finalizado',
+                                    0,
+                                    df_temp['Saldo por cancelar'] - df_temp['Capital pagado'])
+del df_temp['Saldo por cancelar']
+
+#%% cálculo dedías de atraso
 
 
 

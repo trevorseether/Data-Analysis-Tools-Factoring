@@ -85,19 +85,21 @@ filtrado = filtrado[ ~pd.isna(filtrado ['Comprobante_costo_financiamiento'])]
 filtrado = df_online[ ~df_online['Subasta'].isin(list( df_emitidos['CÓDIGO OPERACIÓN'] ))]
 '''
 
-filtrado = filtrado[ filtrado['Saldo por costo de financiamiento cobrado'] != 0]
+columna_saldo_costo_financiamiento = 'SALDO POR COSTO DE FINANCIAMIENTO RECALCULADO' #Saldo por costo de financiamiento cobrado'
 
-filtrado = filtrado[ filtrado['Saldo por costo de financiamiento cobrado'] != '#VALUE!']
+filtrado = filtrado[ filtrado[columna_saldo_costo_financiamiento] != 0]
 
-filtrado = filtrado[ filtrado['Saldo por costo de financiamiento cobrado'] != '#VALOR!']
+filtrado = filtrado[ filtrado[columna_saldo_costo_financiamiento] != '#VALUE!']
 
-filtrado = filtrado[ filtrado['Saldo por costo de financiamiento cobrado'] != '#REF!']
+filtrado = filtrado[ filtrado[columna_saldo_costo_financiamiento] != '#VALOR!']
 
-filtrado = filtrado[ ~pd.isna(filtrado['Saldo por costo de financiamiento cobrado']) ]
+filtrado = filtrado[ filtrado[columna_saldo_costo_financiamiento] != '#REF!']
 
-filtrado = filtrado[ filtrado['Saldo por costo de financiamiento cobrado'] != 'NO HAY REGISTRO DE COSTO COBRADO']
+filtrado = filtrado[ ~pd.isna(filtrado[columna_saldo_costo_financiamiento]) ]
 
-filtrado = filtrado[ filtrado['Saldo por costo de financiamiento cobrado'] != 'NO HAY COMPROBANTE']
+filtrado = filtrado[ filtrado[columna_saldo_costo_financiamiento] != 'NO HAY REGISTRO DE COSTO COBRADO']
+
+filtrado = filtrado[ filtrado[columna_saldo_costo_financiamiento] != 'NO HAY COMPROBANTE']
 
 filtrado = filtrado[ pd.isna(filtrado['Costo de Financiamiento Liquidado emp']) ]
 
@@ -105,7 +107,7 @@ filtrado = filtrado[ pd.isna(filtrado['Costo de Financiamiento Liquidado emp']) 
 df_comprobantes = pd.DataFrame()
 
 df_comprobantes['aux1'] = filtrado['Subasta']
-df_comprobantes['aux2'] = filtrado['Saldo por costo de financiamiento cobrado']
+df_comprobantes['aux2'] = filtrado[columna_saldo_costo_financiamiento]
 
 df_comprobantes['Grupo'] = np.arange(1, len(df_comprobantes) + 1)
 
