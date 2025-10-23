@@ -83,7 +83,7 @@ def parse_dates(date_str):
                 '%d-%m-%Y'             ,
                 '%d/%m/%Y %H:%M:%S'    ,
                 '%d/%m/%Y'             ,
-                '%Y-%d-%m %H:%M:%S'    ,
+                '%Y-%m-%d %H:%M:%S'    ,
                 '%Y%m%d', '%Y-%m-%d'   , 
                 '%Y-%m-%d %H:%M:%S'    , 
                 '%Y/%m/%d %H:%M:%S'    ,
@@ -99,12 +99,49 @@ def parse_dates(date_str):
             pass
     return pd.NaT
 
-df_ops['fecha_de_desembolso']         = df_ops['fecha_de_desembolso'].apply(parse_dates)
-df_ops['fecha_de_finalizacion']       = df_ops['fecha_de_finalizacion'].apply(parse_dates)
-bd_pagos['Fecha de pago del cliente'] = bd_pagos['Fecha de pago del cliente'].apply(parse_dates)
+df_ops['fecha_de_desembolso']    = df_ops['fecha_de_desembolso'].apply(parse_dates)
 
+#%%
+def parse_dates(date_str):
+    '''
+    Parameters
+    ----------
+    date_str : Es el formato que va a analizar dentro de la columna del DataFrame.
+
+    Returns
+    -------
+    Si el date_str tiene una estructura compatible con los formatos preestablecidos
+    para su iteración, la convertirá en un DateTime
+
+    '''
+    #formatos en los cuales se tratará de convertir a DateTime
+    formatos = ['%Y-%d-%m %H:%M:%S'    ,
+                '%d-%m-%Y %H:%M:%S'    ,
+                '%d-%m-%Y'             ,
+                '%d/%m/%Y %H:%M:%S'    ,
+                '%d/%m/%Y'             ,
+                '%Y-%m-%d %H:%M:%S'    ,
+                '%Y%m%d', '%Y-%m-%d'   , 
+                '%Y-%m-%d %H:%M:%S'    , 
+                '%Y/%m/%d %H:%M:%S'    ,
+                '%Y-%m-%d %H:%M:%S PM' ,
+                '%Y-%m-%d %H:%M:%S AM' ,
+                '%Y/%m/%d %H:%M:%S PM' ,
+                '%Y/%m/%d %H:%M:%S AM'     ]
+
+    for formato in formatos:
+        try:
+            return pd.to_datetime(date_str, format=formato)
+        except ValueError:
+            pass
+    return pd.NaT
+
+
+bd_pagos['Fecha de pago del cliente'] = bd_pagos['Fecha de pago del cliente'].apply(parse_dates)
 # bd_pagos['Fecha de pago del cliente'][12]
 bd_pagos['Fecha de pago del cliente'] = pd.to_datetime(bd_pagos['Fecha de pago del cliente'])
+
+df_ops['fecha_de_finalizacion'] = df_ops['fecha_de_finalizacion'].apply(parse_dates)
 
 #%% Fecha finalización de la operación
 # cálculo para validaciones sacando la máxima fecha del BD_PAGOS
@@ -151,25 +188,30 @@ df_fechas['Fecha_corte'] = pd.to_datetime(df_fechas['Fecha_corte'])
 
 #%%
 # Producto cartesiano (todas las combinaciones)
-df_temp = df_fechas.assign(key=1).merge(df_ops.assign(key=1), on='key', how='left').drop('key', axis=1)
+df_temp = df_fechas.assign(key=1).merge(df_ops.assign(key=1), 
+                                        on='key', 
+                                        how='left').drop('key', axis=1)
 
 # Filtrar solo cuando la fecha está entre desembolso y cancelación
 fecha_max = df_temp['Fecha_corte'].max()
 df_temp['fecha_de_finalizacion'] = pd.to_datetime(df_temp['fecha_de_finalizacion'])  # aseguramos tipo datetime
 df_temp['Fecha_corte'] = pd.to_datetime(df_temp['Fecha_corte'])
 df_temp['mes_finalizacion'] = df_temp['fecha_de_finalizacion'].dt.to_period('M').dt.to_timestamp('M')
+df_temp['mes_desembolso'] = df_temp['fecha_de_desembolso'].dt.to_period('M').dt.to_timestamp('M')
 
 def col_aux(df):
     if df['mes_finalizacion'] == df['Fecha_corte']:
         return 'finalizado'
-    if df['mes_finalizacion'] < df['Fecha_corte']:
-        return 'eliminar'
     if df['fecha_de_desembolso'] > df['Fecha_corte']:
+        return 'eliminar'
+    if df['mes_finalizacion'] < df['Fecha_corte']:
         return 'eliminar'
     if df['fecha_de_desembolso'] <= df['Fecha_corte']:
         return 'vigente'
 
 df_temp['aux col filtrado'] = df_temp.apply(col_aux, axis = 1)
+
+df_ops_cartera = df_temp[['Fecha_corte', ]]
 
 #%% filtración, las ops solo aparecen desde que son desembolsadas hasta que son finalizadas
 df_temp = df_temp[df_temp['aux col filtrado'] != 'eliminar']
@@ -180,6 +222,10 @@ cap_original = bd_pagos.pivot_table(index = 'Codigo de prestamo',
                                     aggfunc = 'max').reset_index()
 
 df_o = df_temp[['Fecha_corte', 'codigo_de_prestamo']]
+
+# esta tabla se va a reutilizar para cada vez que se quiera añadir una columna que cambia mensualmente
+df_cortes_ops = df_o.copy() 
+
 df_o = df_o.merge(bd_pagos[['Codigo de prestamo', 
                             'Monto pagado', 
                             'Capital pagado', 
@@ -207,8 +253,6 @@ pivot_pagos.rename(columns = {'Intereses generado': 'Interes pagado',
                               'Monto moratorio' : 'Interes moratorio pagado'},
                    inplace = True)
 
-
-
 #%% union de columnas al df_temp
 df_temp = df_temp.merge(pivot_pagos,
                         on = ['Fecha_corte', 'codigo_de_prestamo'],
@@ -228,19 +272,65 @@ df_temp['Interes moratorio pagado'] = df_temp['Interes moratorio pagado'].fillna
 df_temp['Saldo a favor']            = df_temp['Saldo a favor'].fillna(0)
 
 del df_temp['Codigo de prestamo']
+
 #%% cálculo de saldo capital
 df_temp['Saldo Capital'] = np.where(df_temp['aux col filtrado'] == 'finalizado',
                                     0,
-                                    df_temp['Saldo por cancelar'] - df_temp['Capital pagado'])
+                                    np.maximum(df_temp['Saldo por cancelar'] - df_temp['Capital pagado'], 0))
 del df_temp['Saldo por cancelar']
 
 #%% cálculo dedías de atraso
 # obtenemos la mínima fecha vigente de próximo pago
 
+pagos_pendientes = bd_pagos[['Codigo de prestamo', 'Fecha de pago esperada original' , 'Fecha de pago del cliente']]
+# pagos_pendientes = pagos_pendientes[pd.isna(pagos_pendientes['Fecha de pago del cliente'])]
+
+# esto con el tiempo podría ponerse lento
+df_minima_fecha_pago_vigente = df_fechas.assign(key = 1).merge(pagos_pendientes.assign(key = 1),
+                                                               on  = 'key',
+                                                               how = 'left').drop('key', axis = 1)
+
+df_minima_fecha_pago_vigente = df_minima_fecha_pago_vigente[ ~(df_minima_fecha_pago_vigente['Fecha de pago del cliente'] < df_minima_fecha_pago_vigente['Fecha_corte'])]
+
+prox_fecha_pago = df_minima_fecha_pago_vigente.pivot_table(index = ['Fecha_corte', 'Codigo de prestamo'],
+                                                           values = 'Fecha de pago esperada original',
+                                                           aggfunc = 'min').reset_index()
+prox_fecha_pago.rename(columns = {'Fecha de pago esperada original' : 'fecha proximo pago'},
+                       inplace = True)
+
+# añadiendo la próxima fecha de pago al df_temp
+df_temp = df_temp.merge(prox_fecha_pago,
+                        left_on  = ['Fecha_corte', 'codigo_de_prestamo'],
+                        right_on = ['Fecha_corte', 'Codigo de prestamo'],
+                        how      = 'left')
+df_temp['fecha proximo pago'] = df_temp['fecha proximo pago'].where(
+    df_temp['aux col filtrado'] != 'finalizado',
+    pd.NaT
+)
+
+del df_temp['Codigo de prestamo']
+
+#%% Cálculo días de atraso
+df_temp['dias atraso'] = (df_temp['Fecha_corte'] - df_temp['fecha proximo pago']).dt.days
+
+df_temp['dias atraso'] = df_temp['dias atraso'].fillna(0)
+
+df_temp['dias atraso'] = np.maximum(df_temp['dias atraso'],0)
+
+#%% par 0, 15, 30, 60, 90, 120, 150, 180, 360
+df_temp['par 0']   = np.where(df_temp['dias atraso'] > 0,   df_temp['Saldo Capital'], 0)
+df_temp['par 15']  = np.where(df_temp['dias atraso'] > 15,  df_temp['Saldo Capital'], 0)
+df_temp['par 30']  = np.where(df_temp['dias atraso'] > 30,  df_temp['Saldo Capital'], 0)
+df_temp['par 60']  = np.where(df_temp['dias atraso'] > 60,  df_temp['Saldo Capital'], 0)
+df_temp['par 90']  = np.where(df_temp['dias atraso'] > 90,  df_temp['Saldo Capital'], 0)
+df_temp['par 120'] = np.where(df_temp['dias atraso'] > 120, df_temp['Saldo Capital'], 0)
+df_temp['par 150'] = np.where(df_temp['dias atraso'] > 150, df_temp['Saldo Capital'], 0)
+df_temp['par 180'] = np.where(df_temp['dias atraso'] > 180, df_temp['Saldo Capital'], 0)
+df_temp['par 360'] = np.where(df_temp['dias atraso'] > 360, df_temp['Saldo Capital'], 0)
+
+#%% q_desembolso
+df_temp['q_desembolso'] = np.where(df_temp['mes_desembolso'] == df_temp['Fecha_corte'], 1, 0)
 
 
 
-
-
-
-
+  
