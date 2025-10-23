@@ -20,11 +20,10 @@ warnings.filterwarnings("ignore")
 from datetime import datetime
 hoy_formateado = datetime.today().strftime('%Y-%m-%d')
 
-hoy_formateado = '2025-10-02'
 #%%
-ubi = r'C:\Users\Joseph Montoya\Desktop\loans tape\2025 08'
+ubi = r'C:\Users\Joseph Montoya\Desktop\loans tape\2025 09'
 
-cierre = 202508
+cierre = 202509
 
 os.chdir(ubi)
 

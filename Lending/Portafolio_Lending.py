@@ -103,7 +103,7 @@ df_ops['fecha_de_desembolso']         = df_ops['fecha_de_desembolso'].apply(pars
 df_ops['fecha_de_finalizacion']       = df_ops['fecha_de_finalizacion'].apply(parse_dates)
 bd_pagos['Fecha de pago del cliente'] = bd_pagos['Fecha de pago del cliente'].apply(parse_dates)
 
-bd_pagos['Fecha de pago del cliente'][12]
+# bd_pagos['Fecha de pago del cliente'][12]
 bd_pagos['Fecha de pago del cliente'] = pd.to_datetime(bd_pagos['Fecha de pago del cliente'])
 
 #%% Fecha finalización de la operación
@@ -235,6 +235,8 @@ df_temp['Saldo Capital'] = np.where(df_temp['aux col filtrado'] == 'finalizado',
 del df_temp['Saldo por cancelar']
 
 #%% cálculo dedías de atraso
+# obtenemos la mínima fecha vigente de próximo pago
+
 
 
 

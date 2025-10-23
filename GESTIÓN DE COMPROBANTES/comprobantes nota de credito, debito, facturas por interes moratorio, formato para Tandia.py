@@ -46,6 +46,14 @@ df_emitidos = df_emitidos[~(df_emitidos[col_factura_relacionada].isna() & df_emi
 
 facturas_emitidas = df_emitidos[ df_emitidos['TIPO DE COMPROBANTE'] == 'FACTURA' ]
 df_emitidos = df_emitidos[df_emitidos['TIPO DE COMPROBANTE'].str.contains('NOTA DE')]
+
+ops_incluir = ['X4YZ5vPn', 'BrXeVM9f', 'sI4maSsU', 'pFAxsyvk', 'gWYRarEL', 'TMRsoS7z', '77rF90pd', '42U8nGPa']
+com_vinculado = ['F002-29938', 'F002-30510', 'F002-31318', 'F002-31352', 'F002-25643', 'F002-27005', 'F002-29147', '']
+
+df_emitidos = df_emitidos[ ~df_emitidos['COM. VINCULADO'].isin(com_vinculado)]
+
+
+
 # omitir los que tienen garantía negativa
 df_online = df_online[ ~(df_online['GARANTIA NEGATIVA'] < 0) ]
 
@@ -62,9 +70,9 @@ df_individuales_emitidos = df_individuales_emitidos.drop_duplicates()
 df_online['RUC PROVEEDOR'] = (
     df_online['RUC PROVEEDOR']
     .astype(str)                 # convertir a string
-    .str.replace(',', '', regex=False)  # eliminar comas
+    .str.replace(',',   '', regex=False)  # eliminar comas
     .str.replace('.00', '', regex=False)
-    .str.replace('.0', '', regex=False))
+    .str.replace('.0',  '', regex=False))
 
 #%%
 df_online['Comprobante_costo_financiamiento'] = df_online['Comprobante_costo_financiamiento'].str.strip()
@@ -160,7 +168,7 @@ df_items['Unidad del item'] = 'ZZ'
 
 df_items['Cantidad del item'] = '1'
 
-df_items['Precio del item'] = round(filtrado['Saldo por costo de financiamiento cobrado'].abs().round(2),2)
+df_items['Precio del item'] = round(filtrado[columna_saldo_costo_financiamiento].abs().round(2),2)
 
 df_items['Impuesto'] = 'INA'
     
