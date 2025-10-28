@@ -36,7 +36,7 @@ SELECT
     , A.CODE
     , a.closed_at
     , a.proforma_simulation_financing_total as monto_financiado
-    , c.amount --- MONTO FINANCIADO
+    , c.amount --- MONTO invertido
     , a.proforma_simulation_currency
     , a.proforma_client_payment_date_expected
     , CASE

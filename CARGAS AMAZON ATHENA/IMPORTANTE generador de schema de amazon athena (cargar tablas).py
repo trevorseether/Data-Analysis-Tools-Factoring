@@ -16,12 +16,10 @@ df.to_csv("C:/Users/Joseph Montoya/Desktop/pruebas/parchamiento de fac outstandi
 
 #%%%
 # el nombre del csv, también debe ser el nombre de la carpeta
-nombre_csv = 'tabla_datos'
+nombre_csv = 'portafolio_lending_v1'
 
-df = pd.read_csv(r'C:/Users/Joseph Montoya/Desktop/fac_outs/ba__fac_madres_hijas/ba__fac_madres_hijas.csv',
+df = pd.read_csv(r'G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a/BUSINESS ANALYTICS/FACTORING/PROYECTOS/scripts Joseph/Lending/portafolio_lending_v1',
                  delimiter = ',')
-
-
 
 
 mapping_types = {
@@ -57,6 +55,5 @@ TBLPROPERTIES (
 )
 """
 print(create_table_query)
-
 
 

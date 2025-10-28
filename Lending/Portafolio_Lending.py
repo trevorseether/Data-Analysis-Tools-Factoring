@@ -14,15 +14,34 @@ import os
 import numpy as np
 # pd.options.display.date_format = "%Y-%m-%d"
 
-#%%
-fecha_corte = '2025-10-31'
+import boto3
+import json
+import io
+# import os
+# from datetime import datetime
 
+from pyathena import connect
+
+#%%
+fecha_corte = '2025-11-30'
+
+#%% Credenciales de AmazonAthena
+with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
+    creds = json.load(f)
+
+conn = connect(
+    aws_access_key_id     = creds["AccessKeyId"],
+    aws_secret_access_key = creds["SecretAccessKey"],
+    aws_session_token     = creds["SessionToken"],
+    s3_staging_dir        = creds["s3_staging_dir"],
+    region_name           = creds["region_name"]
+    
+    )
 #%% ops
 df_ops = pd.read_excel(r'G:/Mi unidad/BD_Cobranzas.xlsm',
                        sheet_name= 'Prestamos gestionados',
                             dtype= {'Numero de documento'         : str,
                                     'RUC'                         : str,
-                                    'Nro de cuotas'               : int,
                                     'Monto prestado'              : float,
                                     'TEM'                         : float,
                                     'TEA'                         : float,
@@ -46,6 +65,9 @@ df_ops.columns = (
 df_ops['codigo_de_contrato'] = df_ops['codigo_de_contrato'].str.strip()
 df_ops['codigo_de_prestamo'] = df_ops['codigo_de_prestamo'].str.strip()
 
+df_ops = df_ops.dropna(subset=['fecha_de_desembolso', 'moneda'])
+df_ops['nro_de_cuotas'] = df_ops['nro_de_cuotas'].astype(int)
+df_ops['dias_de_mora'] = df_ops['dias_de_mora'].fillna(0).astype(int)
 ###############################################################################
 bd_pagos = pd.read_excel(r'G:/Mi unidad/BD_Cobranzas.xlsm',
                          sheet_name = 'BD PAGOS',
@@ -186,6 +208,65 @@ fechas = pd.date_range(start = '2025-09-30',  # no tocar este valor
 df_fechas = pd.DataFrame({'Fecha_corte': fechas})
 df_fechas['Fecha_corte'] = pd.to_datetime(df_fechas['Fecha_corte'])
 
+#%% Obtener tipo de cambio del mes
+query = '''
+    select * from prod_datalake_analytics.tipo_cambio_sbs_jmontoya
+'''
+cursor = conn.cursor()
+cursor.execute(query)
+
+# Obtener los resultados
+resultados = cursor.fetchall()
+
+# Obtener los nombres de las columnas
+column_names = [desc[0] for desc in cursor.description]
+
+# Convertir los resultados a un DataFrame de pandas
+tc = pd.DataFrame(resultados, columns=column_names)
+tc['pk'] = pd.to_datetime(tc['pk'])
+tc['mes_tc'] = pd.to_datetime(tc['mes_tc'])
+
+tc = tc[tc['mes_tc'].isin(df_fechas['Fecha_corte'])]
+
+df_fechas = df_fechas.merge(tc[['mes_tc', 'exchange_rate']],
+                            left_on = 'Fecha_corte',
+                            right_on = 'mes_tc',
+                            how = 'left'
+                            )
+
+df_fechas['exchange_rate'] = df_fechas['exchange_rate'].fillna(3.500)
+
+del df_fechas['mes_tc']
+
+#%% Obtener ejecutivo comercial
+query = '''
+    SELECT 
+        codigo_de_negocio___tandia_lending as "codigo_de_prestamo", 
+        CASE
+            WHEN hubspot_owner_id = '407980810' THEN 'Priscila Quispe (pquispe@tandia.pe)'
+            ELSE hubspot_owner_id
+            END AS propietario_negocio
+    FROM prod_datalake_master.hubspot__deal
+    WHERE pipeline = '762912077'
+    AND codigo_de_negocio___tandia_lending IS NOT NULL;
+    
+    '''
+cursor = conn.cursor()
+cursor.execute(query)
+
+# Obtener los resultados
+resultados = cursor.fetchall()
+
+# Obtener los nombres de las columnas
+column_names = [desc[0] for desc in cursor.description]
+
+# Convertir los resultados a un DataFrame de pandas
+ejecutivo = pd.DataFrame(resultados, columns=column_names)
+
+df_ops = df_ops.merge(ejecutivo,
+                      on  = "codigo_de_prestamo",
+                      how = 'left')
+
 #%%
 # Producto cartesiano (todas las combinaciones)
 df_temp = df_fechas.assign(key=1).merge(df_ops.assign(key=1), 
@@ -211,7 +292,6 @@ def col_aux(df):
 
 df_temp['aux col filtrado'] = df_temp.apply(col_aux, axis = 1)
 
-df_ops_cartera = df_temp[['Fecha_corte', ]]
 
 #%% filtración, las ops solo aparecen desde que son desembolsadas hasta que son finalizadas
 df_temp = df_temp[df_temp['aux col filtrado'] != 'eliminar']
@@ -273,6 +353,7 @@ df_temp['Saldo a favor']            = df_temp['Saldo a favor'].fillna(0)
 
 del df_temp['Codigo de prestamo']
 
+#%% solarizando 
 #%% cálculo de saldo capital
 df_temp['Saldo Capital'] = np.where(df_temp['aux col filtrado'] == 'finalizado',
                                     0,
@@ -331,6 +412,122 @@ df_temp['par 360'] = np.where(df_temp['dias atraso'] > 360, df_temp['Saldo Capit
 #%% q_desembolso
 df_temp['q_desembolso'] = np.where(df_temp['mes_desembolso'] == df_temp['Fecha_corte'], 1, 0)
 
+df_temp['m_desembolso'] = np.where(df_temp['mes_desembolso'] == df_temp['Fecha_corte'], df_temp['monto_prestado'], 0)
+
+#%% ordenamiento PENDIENTE
+
+#%% CARGA AL LAKE
+# Cliente de S3
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id        = creds["AccessKeyId"],
+    aws_secret_access_key    = creds["SecretAccessKey"],
+    aws_session_token        = creds["SessionToken"],
+    region_name              = creds["region_name"]
+)
+
+# ==== CONFIGURACIÓN ==== 
+bucket_name = "prod-datalake-raw-730335218320" 
+s3_prefix = "manual/ba/portafolio_lending_v1/" # carpeta lógica en el bucket 
+
+# ==== EXPORTAR A PARQUET EN MEMORIA ====
+csv_buffer = io.StringIO()
+
+# del df_temp['exchange_rate']
+df_temp.to_csv(csv_buffer, index=False, encoding="utf-8-sig") 
+
+# Nombre de archivo con timestamp (opcional, para histórico) 
+s3_key = f"{s3_prefix}portafolio_lending_v1.csv" 
+
+# Subir directamente desde el buffer 
+s3.put_object(Bucket  = bucket_name, 
+              Key     = s3_key, 
+              Body    = csv_buffer.getvalue() 
+              )
+
+print(f"✅ Archivo subido a s3://{bucket_name}/{s3_key}")
+
+df_temp.to_csv('portafolio_lending_v1.csv',
+               index    = 'False',
+               sep      = ',',
+               encoding = 'utf-8-sig')
+
+#%%
+# =============================================================================
+# =============================================================================
+# #                                 COSECHA
+# =============================================================================
+# =============================================================================
+
+cosecha = df_temp[df_temp['q_desembolso'] == 1]
+cosecha = cosecha.sort_values(by='fecha_de_desembolso', ascending = True)
+
+################   colocar mínima fecha de desembolso  ########################
+min_fecha_desembolso = cosecha.pivot_table(values  = 'fecha_de_desembolso',
+                                           index   = 'codigo_de_contrato',
+                                           aggfunc = 'min').reset_index()
+min_fecha_desembolso.rename(columns = {'fecha_de_desembolso': 'min_fecha_desembolso'}, inplace = True)
+cosecha = cosecha.merge(min_fecha_desembolso,
+                        on  = 'codigo_de_contrato',
+                        how = 'left')
+cosecha['fecha_de_desembolso'] = np.where(cosecha['min_fecha_desembolso'].notna(),
+                                          cosecha['min_fecha_desembolso'],
+                                          cosecha['fecha_de_desembolso'])
+cosecha['mes_desembolso'] = cosecha['fecha_de_desembolso'].dt.to_period('M').dt.to_timestamp('M')
+
+del cosecha['min_fecha_desembolso']
+
+################  colocar máximo monto desembolsado  ##########################
+# esto existe por que en caso de ampliación, le ponen un nuevo monto alto
+max_monto_desembolsado = cosecha.pivot_table(values = 'monto_prestado',
+                                           index    = 'codigo_de_contrato',
+                                           aggfunc  = 'max').reset_index()
+max_monto_desembolsado.rename(columns = {'monto_prestado': 'max_monto_desembolsado'}, inplace = True)
+cosecha = cosecha.merge(max_monto_desembolsado,
+                        on  = 'codigo_de_contrato',
+                        how = 'left')
+cosecha['monto_prestado'] = np.where(cosecha['max_monto_desembolsado'].notna(),
+                                     cosecha['max_monto_desembolsado'],
+                                     cosecha['monto_prestado'])
+del cosecha['max_monto_desembolsado']
+
+####### nos quedamos solo con las operaciones validadas para cosecha ##########
+cosecha = cosecha.sort_values(by = 'Fecha_corte', ascending = False)
+cosecha = cosecha.drop_duplicates(subset = 'codigo_de_contrato')
+
+# cosecha, cruce cartesiano ###################################################
+cosecha = cosecha[['codigo_de_contrato', 'fecha_de_desembolso', 'mes_desembolso',
+                   'moneda', 'monto_prestado', 'tipo_de_persona', 'tipo_de_documento',
+                   'numero_de_documento', 'persona_o_rrll', 'ruc', 'empresa', 'correo']]
+
+cosecha = df_fechas.assign(key = 1).merge(cosecha.assign(key = 1),
+                                          on  = 'key',
+                                          how = 'left').drop('key', axis = 1)
+
+cosecha = cosecha[cosecha['mes_desembolso'] <= cosecha['Fecha_corte']]
+
+###### añadiendo datos de cada corte mensual ##################################
+filtracion = df_temp[df_temp['aux col filtrado'] != 'finalizado']
+
+filtracion = filtracion[['Fecha_corte', 'codigo_de_contrato', 'Saldo Capital', 
+                         'fecha proximo pago', 'dias atraso', 'par 0', 'par 15',
+                         'par 30', 'par 60', 'par 90', 'par 120', 'par 150', 
+                         'par 180', 'par 360']]
+
+cosecha = cosecha.merge(filtracion,
+                         on = ['Fecha_corte', 'codigo_de_contrato'],
+                         how = 'left')
+
+cosecha = cosecha[ cosecha['fecha_de_desembolso'] <= cosecha['Fecha_corte'] ]
+
+cosecha['m_desembolso'] = np.where(cosecha['Fecha_corte'] <= cosecha['fecha_de_desembolso'],
+                                   cosecha['monto_prestado'],
+                                   0)
+
+#%%
+cosecha.to_csv('cosecha_lending_v1.csv',
+               encoding = 'utf-8-sig',
+               index = False,
+               sep = ',')
 
 
-  
