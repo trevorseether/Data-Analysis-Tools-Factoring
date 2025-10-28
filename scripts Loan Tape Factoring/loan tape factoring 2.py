@@ -14,6 +14,8 @@ import json
 import os
 import shutil # para copiar archivos en windows
 import numpy as np
+import boto3
+import io
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -26,6 +28,11 @@ ubi = r'C:\Users\Joseph Montoya\Desktop\loans tape\2025 09'
 
 cierre = 202509
 
+crear_excel = False # True o False para crear excel
+
+upload_s3 = True # True o False para cargar a Amazon Athena
+
+#%%
 os.chdir(ubi)
 
 #%% Credenciales de AmazonAthena
@@ -195,9 +202,9 @@ FROM ranked_rows a
 		SELECT code,
 			remaining_capital_soles,
 			dias_atraso
-		FROM prod_datalake_analytics.fac_outst_unidos_f_desembolso_jmontoya
+		FROM prod_datalake_master.ba__fac_outstanding_monthly_snapshot
 -- 		WHERE codmes = '202412'
-		WHERE codmes = '{cierre}'
+		WHERE codmes = {cierre}
 	) b ON a.code = b.code
 	LEFT JOIN prod_datalake_analytics.fac_auctions c ON a.code = c.code
 	LEFT JOIN prod_datalake_analytics.view_fac_user_third_parties d ON a.client_id = d._id
@@ -625,22 +632,130 @@ with pd.ExcelWriter(f"{cierre}_Loan Tape Document For Alt Lenders Factoring Mb.x
 ejemplo_original = r'C:/Users/Joseph Montoya/Desktop/loans tape/ejemplo/ejemplo.xlsx'
 destino = f"{cierre}_Loan Tape Document For Alt Lenders Factoring Mb {hoy_formateado}.xlsx"
 
-# Copiar y renombrar al mismo tiempo
-shutil.copy(ejemplo_original, destino)
-print(f"✅ Archivo copiado y renombrado como '{destino}'")
+if crear_excel == True:
+    # Copiar y renombrar al mismo tiempo
+    shutil.copy(ejemplo_original, destino)
+    print(f"✅ Archivo copiado y renombrado como '{destino}'")
 
 #%% Escribir los dataframes en el excel ya existente
-with pd.ExcelWriter(
-    destino,
-    engine="openpyxl",
-    mode="a",                       # append en vez de sobrescribir
-    if_sheet_exists="replace"       # o "new" para crear nueva hoja aunque el nombre coincida
-) as writer:
-    df.to_excel(writer,         sheet_name="Loans File",               index =False)
-    individual.to_excel(writer, sheet_name="Individual Loan Checks",   index =False)
-    df_pagos.to_excel(writer,   sheet_name="Payments File",            index =False)
-    repayments.to_excel(writer, sheet_name="Repayment Schedules File", index =False)
-    aggregate_checks.to_excel(writer,sheet_name="agg checks",          index =False)
+if crear_excel == True:
+    with pd.ExcelWriter(
+        destino,
+        engine="openpyxl",
+        mode="a",                       # append en vez de sobrescribir
+        if_sheet_exists="replace"       # o "new" para crear nueva hoja aunque el nombre coincida
+    ) as writer:
+        df.to_excel(writer,         sheet_name="Loans File",               index =False)
+        individual.to_excel(writer, sheet_name="Individual Loan Checks",   index =False)
+        df_pagos.to_excel(writer,   sheet_name="Payments File",            index =False)
+        repayments.to_excel(writer, sheet_name="Repayment Schedules File", index =False)
+        aggregate_checks.to_excel(writer,sheet_name="agg checks",          index =False)
+
+#%% Carga al lake
+if upload_s3 == True:
+    ######## hoja loans ###########################################################
+    df['restructured_id'] = ''
+    df['renewed_id'] = ''
+    df['is_pledged_to_lendable'] = ''
+    
+    df['total_loan_amount'] = round(df['collateral_value'] - df['Withholding Amount (Detracción)'],2)
+    df['principal_amount'] = round(df['total_loan_amount'] * df['Financing Percentage'] ,2)
+    
+    loans_s3 = df[[ 'loan_id','customer_id','customer_birth_year','customer_gender','customer_sector',
+                    'branch','status','product','currency','asset_product','loan_purpose',
+                    'begin_date','maturity_date','original_maturity_date','closure_date',
+                    'principal_amount','total_loan_amount','interest_rate','interest_period',
+                    'downpayment','fees','principal_remaining','principal_outstanding',
+                    'interest_outstanding','fee_outstanding','penalty_outstanding',
+                    'days_past_due','collateral_description','collateral_value',
+                    'restructured_id','renewed_id','is_pledged_to_lendable',]]
+    
+    ######## hoja factoring? ######################################################
+    df['interest_amount'] = ''
+    factoring_s3 = df[['loan_id','customer_id','provider_id','customer_birth_year',
+                        'customer_gender','customer_sector','branch','status','product','asset_product',
+                        'loan_purpose','begin_date','maturity_date','original_maturity_date',
+                        'closure_date','currency','principal_amount','total_loan_amount','interest_rate',
+                        'interest_period','downpayment','fees','warranty','interest_amount','principal_remaining',
+                        'principal_outstanding','interest_outstanding','fee_outstanding','penalty_outstanding',
+                        'days_past_due','collateral_description','collateral_value','is_pledged_to_lendable',]]
+    
+    ######## hoja schedules #######################################################
+    repayments['fee_amount'] = ''
+    schedules_s3 = repayments[['loan_id','due_date','amount','principal_amount',
+                                'interest_amount','fee_amount','paid_date']]
+    
+    ######## hoja transactions ####################################################
+    df_pagos['Monto renovado']  = ''
+    df_pagos['payment ranking'] = ''
+    df_pagos['last payment']    = ''
+    transactions_s3 = df_pagos[['loan_id','payment_id','date','amount','principal_amount',
+                                'interest_amount','fee_amount','penalty_amount','payment_mode','payment_source',
+                                'payment_source_payment_id','Monto renovado','payment ranking','last payment',]]
+
+#%%
+# loans_s3.to_csv('loantape_loans_factoring.csv',
+#                 index = False,
+#                 sep = ',',
+#                 encoding = 'utf-8-sig')
+
+# factoring_s3.to_csv('loantape_loans_v2_factoring.csv',
+#                 index = False,
+#                 sep = ',',
+#                 encoding = 'utf-8-sig')
+
+# schedules_s3.to_csv('loantape_schedules_factoring.csv',
+#                 index = False,
+#                 sep = ',',
+#                 encoding = 'utf-8-sig')
+
+# transactions_s3.to_csv('loantape_transactions_factoring.csv',
+#                 index = False,
+#                 sep = ',',
+#                 encoding = 'utf-8-sig')
+
+#%% cargar a Amazon athena
+# Cliente de S3
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id        = creds["AccessKeyId"],
+    aws_secret_access_key    = creds["SecretAccessKey"],
+    aws_session_token        = creds["SessionToken"],
+    region_name              = creds["region_name"]
+)
+
+###############################################################################
+dataframes = [
+    ("loantape_loans_factoring",        loans_s3),
+    ("loantape_loans_v2_factoring",     factoring_s3),
+    ("loantape_schedules_factoring",    schedules_s3),
+    ("loantape_transactions_factoring", transactions_s3)
+]
+
+###############################################################################
+bucket_name = "prod-datalake-raw-730335218320" 
+
+for nombre_tabla, df in dataframes:
+    # ==== CONFIGURACIÓN ==== 
+    s3_prefix = f"manual/ba/{nombre_tabla}/" # carpeta lógica en el bucket 
+    
+    # ==== EXPORTAR A PARQUET EN MEMORIA ====
+    csv_buffer = io.StringIO() 
+    df.to_csv(csv_buffer, index=False, encoding="utf-8-sig") 
+    
+    # Nombre de archivo con timestamp (opcional, para histórico) 
+    s3_key = f"{s3_prefix}{nombre_tabla}.csv" 
+    
+    # Subir directamente desde el buffer 
+    s3.put_object(Bucket  = bucket_name, 
+                  Key     = s3_key, 
+                  Body    = csv_buffer.getvalue() 
+                  )
+    
+    print(f"✅ Archivo subido a s3://{bucket_name}/{s3_key}")
+    
+
+
 
 #%%
 print('fin')
