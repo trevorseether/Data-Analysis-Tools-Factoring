@@ -651,6 +651,7 @@ if crear_excel == True:
         repayments.to_excel(writer, sheet_name="Repayment Schedules File", index =False)
         aggregate_checks.to_excel(writer,sheet_name="agg checks",          index =False)
 
+
 #%% Carga al lake
 if upload_s3 == True:
     ######## hoja loans ###########################################################
@@ -681,7 +682,13 @@ if upload_s3 == True:
                         'days_past_due','collateral_description','collateral_value','is_pledged_to_lendable',]]
     
     ######## hoja schedules #######################################################
-    repayments['fee_amount'] = ''
+    fee_amount = df[['loan_id', 'Structuring Fee']]
+    repayments = repayments.merge(fee_amount,
+                                  on = 'loan_id',
+                                  how = 'left')
+    
+    repayments.rename(columns = {'Structuring Fee': 'fee_amount'}, inplace = True)
+    
     schedules_s3 = repayments[['loan_id','due_date','amount','principal_amount',
                                 'interest_amount','fee_amount','paid_date']]
     
@@ -759,6 +766,5 @@ for nombre_tabla, df in dataframes:
 
 #%%
 print('fin')
-
 
 

@@ -23,13 +23,16 @@ import warnings
 warnings.filterwarnings("ignore")
 
 #%% lectura de archivo de garantías negativas:
-garantias = pd.read_excel(r'C:/Users/Joseph Montoya/Downloads/11.10.25 - CUADRE DE CAJA.xlsx',
+garantias = pd.read_excel(r'C:/Users/Joseph Montoya/Downloads/28.10.25 - CUADRE DE CAJA.xlsx',
                           sheet_name = 'Desembolso de Garantías')
 garantias = garantias[ ~pd.isna(garantias ['CODIGO SUBASTA']) ]
 garantias = garantias[ ~pd.isna(garantias ['GARANTIA']) ]
 garantias['GARANTIA'] = garantias['GARANTIA'].astype(str)
 garantias = garantias[ garantias['GARANTIA'] != "#VALUE!" ]
 garantias = garantias[['CODIGO SUBASTA', 'GARANTIA']]
+
+garantias['GARANTIA'] = garantias['GARANTIA'].str.replace(",", ".")
+garantias = garantias.loc[garantias['GARANTIA'].astype(str).str.strip() != '.']
 
 garantias['GARANTIA'] = pd.to_numeric(garantias['GARANTIA'])
 garantias = garantias[ garantias['GARANTIA'] < 0 ]
@@ -555,7 +558,7 @@ print('creadas garantías negativas, y ops pronto pago')
 # =============================================================================
 # =============================================================================
 # =============================================================================
-# # # # # # # parte de las operaciones offline
+# # # # # # # PARTE DE LAS OPERACIONES OFFLINE
 # =============================================================================
 # =============================================================================
 # =============================================================================
@@ -653,9 +656,9 @@ and length(hd.dealname) > 10
 
 order by hd.dealname
 ), capa2 as (           
-select 
-    tipo_de_producto,
+select     
     Codigo_de_Subasta,
+    tipo_de_producto,
     Etapa_del_Negocio,
     tipo_de_operacion,
     Moneda_del_Monto_Financiado,
@@ -683,14 +686,14 @@ select
         
 
         
-        comision_estructuracion,
+        comision_estructuracion as "comision_estructuracion (para todas las ops mixtas esta columna corresponde a la nota de crédito o débito)",
+        '' as "OPERACIÓN RELACIONADA DE LA COMISIÓN DE ESTRUCTURACIÓN DE OPS MIXTAS (codigo limpiado)",
         
         '' AS Comprobante_Comision_manual,
         '' AS Comprobante_costo_financiamiento_manual,
         Fecha_Desembolso AS Fecha_Desembolso_Hubspot,
 
         '' as "Monto pagado total (manual)",
-        '' as " ",
         '' as "Estado de cobranza real (manual)",
         Monto_pagado_total as "Monto pagado total (teórico para validaciones)",
         '' as "Interés Bruto pagado a Crowd (manual)",
@@ -711,7 +714,7 @@ select * from capa2
 
 #%%
 import pandas as pd
-# import numpy as np
+import numpy as np
 # import boto3
 from pyathena import connect
 # import openpyxl
@@ -756,6 +759,127 @@ column_names = [desc[0] for desc in cursor.description]
 df_offlines = pd.DataFrame(resultados, columns=column_names)
 
 print('query offline ejecutada')
+
+dups = df_offlines[df_offlines.duplicated(subset='Codigo_de_Subasta', keep=False)]
+if dups.shape[0] > 0:
+    print('presencia de duplicados')
+
+#%% facturas por comisión de estructuración y costo de financiamientos, actualmente para rellenar solo en ops mixtas
+query = """
+with concepto_interes as (
+        select
+            fr.code as "Codigo_de_Subasta_i",
+            int.code as "comprobante costo de financiamiento",
+            int.concept as "concepto interes",
+            int.updated_at as fecha_i
+        from prod_datalake_analytics.view_prestamype_fac_cpe as int
+        left join prod_datalake_analytics.fac_requests as fr
+        on int.request_id = fr._id
+        
+        where int.concept in ('interest-factoring', 'interest-confirming')
+), concepto_comision as (
+        select
+            fr.code as "Codigo_de_Subasta_c",
+            com.code as "comprobante costo de comision",
+            com.concept as "concepto comision",
+            com.updated_at as fecha_c
+        from prod_datalake_analytics.view_prestamype_fac_cpe as com
+        left join prod_datalake_analytics.fac_requests as fr
+        on com.request_id = fr._id
+        
+        where com.concept in ('commission-factoring', 'commission-confirming')
+)
+select
+    coalesce( i."Codigo_de_Subasta_i", c."Codigo_de_Subasta_c" ) as Codigo_de_Subasta,
+    coalesce( i.fecha_i, c.fecha_c) as fecha,
+    i."comprobante costo de financiamiento",
+    i."concepto interes",
+    
+    c."comprobante costo de comision",
+    c."concepto comision"
+    
+from concepto_interes as i
+full join concepto_comision as c
+on i."Codigo_de_Subasta_i" = c."Codigo_de_Subasta_c"
+
+"""
+
+cursor = conn.cursor()
+cursor.execute(query_offline)
+
+# Obtener los resultados
+resultados = cursor.fetchall()
+
+# Obtener los nombres de las columnas
+column_names = [desc[0] for desc in cursor.description]
+
+# Convertir los resultados a un DataFrame de pandas
+df_comprobantes = pd.DataFrame(resultados, columns=column_names)
+
+print('query comprobantes ejecutada')
+
+df_comprobantes
+#%% trayendo hoja offline_automatizada
+
+UBI       = 'G:/Mi unidad'
+DOCUMENTO = 'Pagados 122024 en adelante.xlsx' #'Pagados arreglado.xlsx'
+df_off_automat = pd.read_excel(UBI + '/' + DOCUMENTO,
+                               sheet_name ='Offline automatizado')
+
+df_off_automat = df_off_automat.dropna(subset=['Codigo_de_Subasta', 'tipo_de_producto', 'Etapa_del_Negocio'])
+
+dups = df_off_automat[df_off_automat.duplicated(subset = 'Codigo_de_Subasta', keep = False)]
+if dups.shape[0] > 0:
+    print('presencia de duplicados')
+
+#%% ops existentes, actualizando sus datos
+col_ops_existentes = df_off_automat[['Codigo_de_Subasta']]
+
+hoja_actualizada = col_ops_existentes.merge(df_offlines,
+                                            on = 'Codigo_de_Subasta',
+                                            how = 'left')
+
+dups = hoja_actualizada[hoja_actualizada.duplicated(subset = 'Codigo_de_Subasta', keep = False)]
+if dups.shape[0] > 0:
+    print('presencia de duplicados')
+
+#%% ops nuevas
+nuevos = df_offlines[ ~df_offlines['Codigo_de_Subasta'].isin(col_ops_existentes.squeeze())] # necesario el squeeze para convertir dataframe a series
+
+#%% insertar cálculos adicionales
+
+### limpieza de ops mixtas para
+### "OPERACIÓN RELACIONADA DE LA COMISIÓN DE ESTRUCTURACIÓN DE OPS MIXTAS (codigo limpiado)"
+
+mixtas = df_off_automat[df_off_automat['tipo_de_operacion'] == 'Mixta']
+mixtas = mixtas[['Codigo_de_Subasta', "OPERACIÓN RELACIONADA DE LA COMISIÓN DE ESTRUCTURACIÓN DE OPS MIXTAS (codigo limpiado)"]]
+
+nuevos_mixtos = nuevos[nuevos['tipo_de_operacion'] == 'Mixta']
+mixtas = pd.concat([mixtas, nuevos_mixtos[['Codigo_de_Subasta', "OPERACIÓN RELACIONADA DE LA COMISIÓN DE ESTRUCTURACIÓN DE OPS MIXTAS (codigo limpiado)"]]], ignore_index = True)
+mixtas['limpiado'] = mixtas['Codigo_de_Subasta'].str.split('-').str[0].str.strip()
+
+mixtas['op relacionada lista para merge'] = np.where(mixtas["OPERACIÓN RELACIONADA DE LA COMISIÓN DE ESTRUCTURACIÓN DE OPS MIXTAS (codigo limpiado)"].isna(),
+                                                     mixtas['limpiado'],
+                                                     mixtas["OPERACIÓN RELACIONADA DE LA COMISIÓN DE ESTRUCTURACIÓN DE OPS MIXTAS (codigo limpiado)"])
+
+# también incluye nuevas ops mixtas
+mixtas = mixtas[['Codigo_de_Subasta', 'op relacionada lista para merge']]
+
+#%% Hoja concatenada
+df = pd.concat([hoja_actualizada, nuevos], ignore_index = True)
+
+dups = df[df.duplicated(subset = 'Codigo_de_Subasta', keep = False)]
+if dups.shape[0] > 0:
+    print('presencia de duplicados')
+    
+#%% añadiendo columna "OPERACIÓN RELACIONADA DE LA COMISIÓN DE ESTRUCTURACIÓN DE OPS MIXTAS (codigo limpiado)"
+df = df.merge(mixtas,
+              on  ='Codigo_de_Subasta',
+              how = 'left')
+df["OPERACIÓN RELACIONADA DE LA COMISIÓN DE ESTRUCTURACIÓN DE OPS MIXTAS (codigo limpiado)"] = df['op relacionada lista para merge']
+
+del df['op relacionada lista para merge']
+
 #%% convertir columnas de tasas, donde la separación es el punto, a coma
 # comprobar si este código es eliminable cuando se automatice la escritura en el google sheet
 
@@ -775,13 +899,30 @@ for col in columnas:
     df_offlines[col] = df_offlines[col].apply(lambda x: f"{x:.5f}".replace('.', ',') if pd.notna(x) else "")
 '''
 #%%
-df_offlines = df_offlines.fillna(' ')
-#%%
-df_offlines.to_excel(rf'C:\Users\Joseph Montoya\Desktop\pruebas\gestion de comprobantes offlines {today_date}.xlsx',
-                     index = False)
+# df_offlines = df_offlines.fillna(' ')
 
-print('excel offline creado')
-#%%
-print('fin')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# #%%
+# df_offlines.to_excel(rf'C:\Users\Joseph Montoya\Desktop\pruebas\gestion de comprobantes offlines {today_date}.xlsx',
+#                      index = False)
+
+# print('excel offline creado')
+# #%%
+# print('fin')
 
                                                                 
