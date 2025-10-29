@@ -566,7 +566,29 @@ print('creadas garantías negativas, y ops pronto pago')
 
 query_offline = ''' 
 
-with capa1 as (   
+with domicilio_fiscal as(
+
+SELECT 
+    cast(ruc as bigint) as ruc,
+    domicilio_fiscal
+fROM "prod_datalake_master"."transversal__ruc_info_sunat"
+
+), correos as(
+
+SELECT
+
+    try_cast(document as bigint) as ruc
+    ,EMAIL
+
+FROM prod_datalake_analytics.prestamype__customers
+where type_document_short_name = 'RUC'
+and try_cast(document as bigint) is not null
+and email is not null 
+
+),
+
+
+capa1 as (   
 SELECT
     hd.tipo_de_producto,
     hd.tipo_de_operacion,
@@ -588,10 +610,18 @@ SELECT
     round(CAST(REPLACE(REPLACE(hd.tasa_de_venta____, '%', ''), ',', '.') AS DOUBLE) / 100,5) as Tasa_interes_crowd,
     
     --'' as Costo_Financiamiento_teorico
+    hd.costo_financiamiento__con_igv____ordering,
     hd.ruc_proveedor,
     hd.proveedor as razon_social,
+    
+    /*
     ' ' as Direccion,
     ' ' as correo,
+    */
+                
+    dom.domicilio_fiscal, 
+    co.EMAIL,
+
     HT.CLOSED_DATE as fecha_pago_real,
     ht.monto_pagado_facturas as  Monto_pagado_total,
     hd.comision_estructuracion
@@ -606,6 +636,12 @@ ON DS.id_dealstage = HD.dealstage
 
 LEFT JOIN (select * from prod_datalake_master.hubspot__ticket WHERE hs_pipeline = '26417284') AS ht
 ON HD.dealname = HT.subject
+
+left join domicilio_fiscal as dom
+on cast(dom.ruc as bigint) = cast(hd.ruc_proveedor as bigint) 
+
+left join correos as co   
+on cast(co.ruc as bigint) = cast(hd.ruc_proveedor as bigint) 
 
 WHERE PID.LABEL = 'Prestamype - Factoring'
 and ds.label_dealstage not in ( 'Cancelado (Subasta desierta) (Prestamype - Factoring)', 
@@ -633,15 +669,20 @@ select
     Tasa_interes_crowd,
     
     --(date_diff('day', Fecha_Desembolso, Fecha_esperada_pago)) as dias_dif,
+    case when costo_financiamiento__con_igv____ordering is not null then costo_financiamiento__con_igv____ordering
     
+    else
         round((Monto_Financiado * (
             pow(1 + Tasa_interes_empresario, date_diff('day', Fecha_Desembolso, Fecha_esperada_pago) / 30.0)
-        ) - Monto_Financiado),2) AS Costo_Financiamiento_teorico,
+        ) - Monto_Financiado),2) end AS Costo_Financiamiento_teorico,
         
         ruc_proveedor,
         razon_social,
-        Direccion,
-        correo,
+        domicilio_fiscal as "Direccion",  
+        EMAIL as "Correo",
+        
+
+        
         comision_estructuracion,
         
         '' AS Comprobante_Comision_manual,
@@ -649,7 +690,7 @@ select
         Fecha_Desembolso AS Fecha_Desembolso_Hubspot,
 
         '' as "Monto pagado total (manual)",
-        '' as 
+        '' as " ",
         '' as "Estado de cobranza real (manual)",
         Monto_pagado_total as "Monto pagado total (teórico para validaciones)",
         '' as "Interés Bruto pagado a Crowd (manual)",
@@ -665,7 +706,6 @@ select
 
 )
 select * from capa2
-
 
 '''
 
