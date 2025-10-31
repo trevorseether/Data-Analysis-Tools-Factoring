@@ -48,7 +48,20 @@ df = pd.DataFrame(resultados, columns=column_names)
 #%%
 df2 = pd.concat([df] * 2, ignore_index=True)  # duplicar
 
+#%% añadir la columna _timestamp
+from datetime import datetime
+from zoneinfo import ZoneInfo
+################################################################################
+# Hora actual en Perú (UTC-5)
+now = datetime.now(ZoneInfo("America/Lima"))
+
+# Guardar directamente el objeto datetime
+df["_timestamp"] = now
+print(now)
+
 #%%
+nombre_tabla = 'fac_metas_comercial'
+
 # Cliente de S3
 s3 = boto3.client(
     "s3",
@@ -59,16 +72,16 @@ s3 = boto3.client(
 )
 
 # ==== CONFIGURACIÓN ====
-bucket_name = "prod-datalake-raw-730335218320"
-s3_prefix   = "manual/ba/ejemplo1/"  # carpeta lógica en el bucket
+bucket_name = "prod-datalake-sandbox-730335218320"
+s3_prefix   = f"{nombre_tabla}/"  # carpeta lógica en el bucket
 
 # ==== EXPORTAR A PARQUET EN MEMORIA ====
 parquet_buffer = io.BytesIO()
-df2.to_parquet(parquet_buffer, index=False, engine="pyarrow")  
+df.to_parquet(parquet_buffer, index=False, engine="pyarrow")
 # también puedes usar engine="fastparquet" si lo prefieres
 
 # Nombre de archivo con timestamp (opcional)
-s3_key = f"{s3_prefix}ejemplo1.parquet"
+s3_key = f"{s3_prefix}{nombre_tabla}.parquet"
 
 # Subir directamente desde el buffer
 s3.put_object(
@@ -77,7 +90,6 @@ s3.put_object(
     Body   = parquet_buffer.getvalue()
 )
 
-print(f"✅ Archivo subido a s3://{bucket_name}/{s3_key}")
- 
+print(f"✅ Archivo subido a s3://{bucket_name}{s3_key}")
  
  

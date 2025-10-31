@@ -68,6 +68,7 @@ TBLPROPERTIES (
 )
 """
 create_table_query = create_table_query.replace("`_timestamp` string", "`_timestamp` TIMESTAMP")
+create_table_query = create_table_query.replace("`_timestamp` TIMESTAMP.", "`_timestamp` TIMESTAMP")
 
 print(create_table_query)
 
