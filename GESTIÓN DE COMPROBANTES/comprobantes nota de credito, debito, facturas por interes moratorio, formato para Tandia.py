@@ -112,9 +112,6 @@ filtrado = df_online[ ~df_online['Subasta'].isin(list( df_emitidos['CÓDIGO OPER
 columna_saldo_costo_financiamiento = 'SALDO POR COSTO DE FINANCIAMIENTO RECALCULADO' #Saldo por costo de financiamiento cobrado'
 
 ###############################################################################
-filtrado 
-
-###############################################################################
 filtrado = filtrado[ filtrado[columna_saldo_costo_financiamiento] != 0]
 
 filtrado = filtrado[ filtrado[columna_saldo_costo_financiamiento] != '#VALUE!']
@@ -129,7 +126,7 @@ filtrado = filtrado[ filtrado[columna_saldo_costo_financiamiento] != 'NO HAY REG
 
 filtrado = filtrado[ filtrado[columna_saldo_costo_financiamiento] != 'NO HAY COMPROBANTE']
 
-filtrado = filtrado[ pd.isna(filtrado['Costo de Financiamiento Liquidado emp']) ]
+# filtrado = filtrado[ pd.isna(filtrado['Costo de Financiamiento Liquidado emp']) ] # desativado porque en lugar de nulos hay ''
 
 #%% CREACIÓN DE BASE
 df_comprobantes = pd.DataFrame()
