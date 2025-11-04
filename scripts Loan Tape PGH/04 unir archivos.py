@@ -18,6 +18,8 @@ today_date = datetime.now(peru_tz).strftime('%Y%m%d')
 
 today_date = '20251002'
 #%%
+crear_excel = True # crear excel, True o False
+cargar_lake = True # cargar al lake, True o False
 cierre = '202508'
 os.chdir(rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} existing')
 
@@ -232,36 +234,134 @@ with pd.ExcelWriter(f"{cierre}_Loan Tape Document For Alt Lenders_moises_barruet
     payments.to_excel(writer, sheet_name="Payments File", index=False)
 '''
 #%%% copiar excel de ejemplo
-ejemplo_original = r'C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/ejemplo.xlsx'
-destino = f"{cierre}_Loan Tape Document For Alt Lenders_moises_barrueta V2.xlsx"
-
-# Copiar y renombrar al mismo tiempo
-shutil.copy(ejemplo_original, destino)
-print(f"✅ Archivo copiado y renombrado como '{destino}'")
+if crear_excel == True:
+    ejemplo_original = r'C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/ejemplo.xlsx'
+    destino = f"{cierre}_Loan Tape Document For Alt Lenders_moises_barrueta V2.xlsx"
+    
+    # Copiar y renombrar al mismo tiempo
+    shutil.copy(ejemplo_original, destino)
+    print(f"✅ Archivo copiado y renombrado como '{destino}'")
 
 #%% Escribir los dataframes en el excel ya existente
-with pd.ExcelWriter(
-    destino,
-    engine="openpyxl",
-    mode="a",                       # append en vez de sobrescribir
-    if_sheet_exists="replace"       # o "new" para crear nueva hoja aunque el nombre coincida
-) as writer:
-    loans.to_excel(writer,       sheet_name="Loans File",               index = False)
-    individuals.to_excel(writer, sheet_name="Individual Loan Checks",   index = False)
-    repayments.to_excel(writer,  sheet_name="Repayment Schedules File", index = False)
-    payments.to_excel(writer,    sheet_name="Payments File",            index = False)
-    aggregate_checks.to_excel(writer, sheet_name="agg checks",          index = False)
+if crear_excel == True:
+    with pd.ExcelWriter(
+        destino,
+        engine="openpyxl",
+        mode="a",                       # append en vez de sobrescribir
+        if_sheet_exists="replace"       # o "new" para crear nueva hoja aunque el nombre coincida
+    ) as writer:
+        loans.to_excel(writer,       sheet_name="Loans File",               index = False)
+        individuals.to_excel(writer, sheet_name="Individual Loan Checks",   index = False)
+        repayments.to_excel(writer,  sheet_name="Repayment Schedules File", index = False)
+        payments.to_excel(writer,    sheet_name="Payments File",            index = False)
+        aggregate_checks.to_excel(writer, sheet_name="agg checks",          index = False)
+    print('excel creado')
+
+#%%
+# =============================================================================
+# =============================================================================
+# # Disponibilizar hojas del LoanTape de PGH
+# =============================================================================
+# =============================================================================
+
+#%%
+if cargar_lake == True:
+    loans['downpayment']            = ''
+    loans['FEE'] = round(loans['principal_amount'] * loans['percent_Fee'],2 )
+    loans['fees'] = loans['FEE'].copy()
+    loans['principal_remaining']    = ''
+    loans['fee_outstanding']        = ''
+    loans['penalty_outstanding']    = ''
+    loans['is_pledged_to_lendable'] = ''
+    loans_s3 = loans[['loan_id','customer_id','customer_birth_year','customer_gender','customer_sector','branch','status',
+                        'product','currency','asset_product','loan_purpose','begin_date','maturity_date','original_maturity_date','closure_date',
+                        'principal_amount','total_loan_amount','interest_rate','interest_period','downpayment','fees','principal_remaining',
+                        'principal_outstanding','interest_outstanding','fee_outstanding','penalty_outstanding','days_past_due','collateral_description',
+                        'collateral_value','restructured_id','renewed_id','is_pledged_to_lendable',]]
+    
+    schedules_s3 = repayments[['loan_id','due_date','amount','principal_amount',
+                               'interest_amount','fee_amount','paid_date',]]
+    
+    payments['payment ranking'] = ''
+    payments['last payment']    = ''
+    transactions_s3 = payments[['loan_id','payment_id','date','amount','principal_amount','interest_amount',
+                                'fee_amount','penalty_amount','payment_mode','payment_source','payment_source_payment_id','Monto renovado',
+                                'payment ranking','last payment',]]
+    
+# loans_s3.to_csv('loantape_loans_pgh.csv',
+#                 index = False,
+#                 sep = ',',
+#                 encoding = 'utf-8-sig')
+# schedules_s3.to_csv('loantape_schedules_pgh.csv',
+#                 index = False,
+#                 sep = ',',
+#                 encoding = 'utf-8-sig')
+# transactions_s3.to_csv('loantape_transactions_pgh.csv',
+#                 index = False,
+#                 sep = ',',
+#                 encoding = 'utf-8-sig')
+
+#%% cargar a Amazon athena
+import boto3
+import json
+import io
+from pyathena import connect
+
+#%% Credenciales de AmazonAthena
+txt_credenciales_athena = r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt" # no cambiar
+
+with open(txt_credenciales_athena) as f:
+    creds = json.load(f)
+
+conn = connect(
+    aws_access_key_id     = creds["AccessKeyId"],
+    aws_secret_access_key = creds["SecretAccessKey"],
+    aws_session_token     = creds["SessionToken"],
+    s3_staging_dir        = creds["s3_staging_dir"],
+    region_name           = creds["region_name"]
+    
+    )
+
+#%%
+
+# Cliente de S3
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id        = creds["AccessKeyId"],
+    aws_secret_access_key    = creds["SecretAccessKey"],
+    aws_session_token        = creds["SessionToken"],
+    region_name              = creds["region_name"]
+)
+
+###############################################################################
+dataframes = [
+    ("loantape_loans_pgh",         loans_s3),
+    ("loantape_schedules_pgh",     schedules_s3),
+    ("loantape_transactions_pgh",  transactions_s3),
+]
+
+###############################################################################
+bucket_name = "prod-datalake-raw-730335218320" 
+
+for nombre_tabla, df in dataframes:
+    # ==== CONFIGURACIÓN ==== 
+    s3_prefix = f"manual/ba/{nombre_tabla}/" # carpeta lógica en el bucket 
+    
+    # ==== EXPORTAR A PARQUET EN MEMORIA ====
+    csv_buffer = io.StringIO() 
+    df.to_csv(csv_buffer, index=False, encoding="utf-8-sig") 
+    
+    # Nombre de archivo con timestamp (opcional, para histórico) 
+    s3_key = f"{s3_prefix}{nombre_tabla}.csv" 
+    
+    # Subir directamente desde el buffer 
+    s3.put_object(Bucket  = bucket_name, 
+                  Key     = s3_key, 
+                  Body    = csv_buffer.getvalue() 
+                  )
+    
+    print(f"✅ Archivo subido a s3://{bucket_name}/{s3_key}")
 
 #%%
 print('fin')
-
-
-
-
-
-
-
-
-
-
 
