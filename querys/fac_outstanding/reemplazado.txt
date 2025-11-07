@@ -2,3 +2,6 @@ reemplazado
 -por amount el monto pagado total , antes era distribution_provider_amount_payment_client
 -reemplazado fac_auctions por fac_requests
 
+- a.proforma_end_client_payment_date_expected e_payment_date (fac_auctions) por b.proforma_client_payment_date_expected (fac_requests)
+
+- 06/11/2025 se ha añadido la cobranza de pagos_facturas para calcular el nuevo capital a las operaciones offline y compras internas

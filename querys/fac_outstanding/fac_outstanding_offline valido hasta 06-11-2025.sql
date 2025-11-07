@@ -1,33 +1,18 @@
---CREATE OR REPLACE VIEW "fac_outst_offline_jmontoya" AS 
+CREATE OR REPLACE VIEW "fac_outst_offline_jmontoya" AS 
 WITH
   cortes_mensuales AS (
    SELECT DATE_ADD('day', -1, DATE_TRUNC('month', DATE_ADD('month', (x + 1), DATE '2021-03-31'))) fecha_eomonth
    FROM
      UNNEST(SEQUENCE(0, 120)) t (x)
    WHERE (DATE_ADD('day', -1, DATE_TRUNC('month', DATE_ADD('month', (x + 1), DATE '2021-03-31'))) <= DATE_ADD('day', -1, DATE_TRUNC('month', DATE_ADD('month', 1, current_date))))
-   
-), nuevo_capital_pagos_facturas AS (
-
-        SELECT
-            c_digo_de_subasta                                         AS "code_PF",
-            DATE_FORMAT(fecha_de_pago_registrado, '%Y-%m')            AS "anio_mes",
-            MAX_BY(nuevo_capital___offline, fecha_de_pago_registrado) AS "NUEVO_CAPITAL",
-            MAX(fecha_de_pago_registrado)                             AS "FECHA PAGO",
-            date_add('day', -1, date_add('month', 1, date_trunc('month', MAX(fecha_de_pago_registrado)))) AS "eomonth"
-        from prod_datalake_master."hubspot__pagos_facturas"
-        where hs_pipeline = '42484623'
-        and nuevo_capital___offline is not null
-
-        GROUP BY c_digo_de_subasta,
-        DATE_FORMAT(fecha_de_pago_registrado, '%Y-%m')
-
-), datos_planos AS (
+) 
+, datos_planos AS (
    SELECT
      hubspot__deal.dealname "Code"
-   , hubspot__deal.proveedor "company_name"
-   , CAST(hubspot__deal.ruc_proveedor AS VARCHAR) "company_ruc"
-   , hubspot__deal.cliente "user_third_party_name"
-   , hubspot__deal.ruc_cliente "user_third_party_ruc"
+   , hubspot__deal.cliente "company_name"
+   , hubspot__deal.ruc_cliente "company_ruc"
+   , hubspot__deal.proveedor "user_third_party_name"
+   , CAST(hubspot__deal.ruc_proveedor AS VARCHAR) "user_third_party_ruc"
    , hubspot__deal.tipo_de_producto "product"
    , ROUND(hubspot__deal.monto_adelanto, 2) "monto_de_adelanto"
    , ROUND(hubspot__deal.monto_financiado, 2) "monto_financiado"
@@ -48,9 +33,8 @@ WITH
    , hubspot__deal.n__facturas
    , hubspot__deal.monto_neto_de_facturas__factoring_
    , hubspot_owner_id
-   , FC2.monto_pagado_facturas amortizado_tickets
    FROM
-     (((((prod_datalake_master.hubspot__deal hubspot__deal
+     ((((prod_datalake_master.hubspot__deal hubspot__deal
    LEFT JOIN prod_datalake_master.factoring__fac_auctions_disbursement_date fac_disb ON (hubspot__deal.dealname = fac_disb.codigo_de_subasta))
    LEFT JOIN (
       SELECT
@@ -77,13 +61,31 @@ WITH
         subject
       , closed_date "FECHA_PAGO_HUB_TICKETS"
       , tipo_de_pago
-      , monto_pagado_facturas
       FROM
         prod_datalake_master.hubspot__ticket
       WHERE (hs_pipeline = '26417284')
    )  FC2 ON (FC2.SUBJECT = hubspot__deal.dealname))
-   LEFT JOIN prod_datalake_master.ba__dealstages_id dl ON (dl.id_dealstage = hubspot__deal.dealstage))
-   WHERE ((hubspot__deal.pipeline = '14026011') AND (length(hubspot__deal.dealname) > 10) AND (NOT (dl.label_dealstage IN ('Cancelado (Subasta desierta) (Prestamype - Factoring)', 'Rechazado (Prestamype - Factoring)'))) AND (COALESCE(hubspot__deal.flag_comprado, '') <> 'Si') AND (NOT (hubspot__deal.dealname IN (SELECT dealname
+   
+   LEFT JOIN prod_datalake_master.ba__dealstages_id as dl on dl.id_dealstage = hubspot__deal.dealstage
+
+   
+WHERE (((((hubspot__deal.pipeline = '14026011') 
+AND length(hubspot__deal.dealname) > 10
+   and dl.label_dealstage not in (  'Cancelado (Subasta desierta) (Prestamype - Factoring)',
+                                    'Rechazado (Prestamype - Factoring)')
+
+   AND COALESCE(hubspot__deal.flag_comprado, '') != 'Si'
+   /*
+   (hubspot__deal.tipo_de_operacion IN ('Offline', 'Mixta')) 
+   AND (((hubspot__deal.dealstage IN ('14026017', '14026015')) AND (hubspot__deal.tipo_de_producto IN ('Factoring', 'Confirming', 'Ordering'))) 
+    OR ((NOT (hubspot__deal.dealstage IN ('14026017', '14026015', '14026018', '14026016'))) AND (hubspot__deal.fecha_de_desembolso__factoring_ IS NOT NULL) 
+   AND (hubspot__deal.tipo_de_producto IN ('Factoring', 'Confirming', 'Ordering'))))) 
+   AND (NOT (hubspot__deal.pipeline IN ('1105313628')))) OR ((pipeline = '14026011') 
+   AND (dealstage IN ('47883049', '14026013', '14026014', '54920842')) 
+   AND (fecha_de_desembolso__factoring_ IS NOT NULL))) 
+   */
+   
+   AND (NOT (hubspot__deal.dealname IN (SELECT dealname
 FROM
   prod_datalake_master.hubspot__deal
 WHERE ((dealstage <> '1115970054') AND (codigo_de_subasta IN (SELECT DISTINCT codigo_de_subasta
@@ -91,8 +93,8 @@ FROM
   prod_datalake_master.hubspot__deal
 WHERE (dealstage = '1115970054')
 )))
-))))
-) 
+)))
+)))))
 , cobranza AS (
    SELECT
      monto_registrado
@@ -121,33 +123,8 @@ WHERE (dealstage = '1115970054')
    FROM
      cobranza_cortes_mensuales_desagrupada
    GROUP BY fecha_eomonth, c_digo_de_subasta
-   
-), cartera_auxiliar as (            
-
-    SELECT
-        dp.code AS code,
-        cm.fecha_eomonth AS fecha_cierre
-    FROM cortes_mensuales cm
-    LEFT JOIN datos_planos dp
-      ON dp.MES_DESEMBOLSO <= cm.fecha_eomonth
-     AND cm.fecha_eomonth <= COALESCE(
-            dp."MES CANCELACION",
-            DATE_ADD('day', -1, DATE_ADD('month', 1, DATE_TRUNC('month', current_date)))
-        )
-
-), nuevo_capital_propagado_tabla as (     
-
-    SELECT
-        c.code,
-        c.fecha_cierre,
-        MAX_BY(ncpf.nuevo_capital, ncpf."FECHA PAGO") AS "NUEVO_CAPITAL"
-    FROM cartera_auxiliar c
-    LEFT JOIN nuevo_capital_pagos_facturas ncpf
-      ON ncpf.code_pf = c.code
-     AND ncpf.eomonth <= c.fecha_cierre
-    GROUP BY c.code, c.fecha_cierre
-
-), cartera_1 AS (
+) 
+, cartera_1 AS (
    SELECT
      dp.code code
    , cm.fecha_eomonth fecha_cierre
@@ -164,9 +141,8 @@ WHERE (dealstage = '1115970054')
    , DP.Moneda_Monto_Factura currency_request
    , DP.moneda_del_monto_financiado currency_auctions
    , ROUND(DP.tasa_de_financiamiento_asignada, 5) assigned_financing_rate
-   , (CASE WHEN (CM.fecha_eomonth = DP."MES CANCELACION") THEN 0 
-           WHEN ncpt."NUEVO_CAPITAL" is not null then ncpt."NUEVO_CAPITAL"
-           ELSE dp.monto_neto_de_facturas__factoring_ END) total_net_amount_pending_payment   , DP.fecha_esperada_pago e_payment_date_original
+   , (CASE WHEN (CM.fecha_eomonth = DP."MES CANCELACION") THEN 0 ELSE dp.monto_neto_de_facturas__factoring_ END) total_net_amount_pending_payment
+   , DP.fecha_esperada_pago e_payment_date_original
    , DP.monto_financiado amount_financed
    , DATE_DIFF('day', DP.Fecha_de_desembolso_hub, DP.fecha_esperada_pago) terms
    , DP.monto_de_adelanto amount_advance
@@ -200,26 +176,14 @@ WHERE (dealstage = '1115970054')
    , 0 recurrent_clients
    , 0 new_providers
    , 0 recurrent_providers
-   
-   , (CASE  WHEN (dp."MES CANCELACION" = cm.fecha_eomonth) THEN 0E0 
-            WHEN NCPT."NUEVO_CAPITAL" IS NOT NULL THEN NCPT."NUEVO_CAPITAL"   
-            ELSE greatest(round((dp.monto_financiado - dp.amortizado_tickets), 2), 0E0) END) remaining_capital
-   , (CASE  WHEN (cm.fecha_eomonth < DP."FECHA CANCELACION") THEN dp.monto_neto_de_facturas__factoring_ 
-            WHEN NCPT."NUEVO_CAPITAL" IS NOT NULL THEN NCPT."NUEVO_CAPITAL"
-            ELSE 0 END) remaining_total_amount
-            
+   , (CASE WHEN (dp."MES CANCELACION" = cm.fecha_eomonth) THEN 0 ELSE round(dp.monto_financiado, 2) END) remaining_capital
+   , (CASE WHEN (cm.fecha_eomonth < DP."FECHA CANCELACION") THEN dp.monto_neto_de_facturas__factoring_ ELSE 0 END) remaining_total_amount
    , (CASE WHEN (CM.fecha_eomonth = DP."MES CANCELACION") THEN 'finalizado' ELSE 'vigente' END) actual_status
    , false flag_excluir
    , (CASE WHEN (DP.e_payment_date > CM.fecha_eomonth) THEN 0 WHEN ((DP.e_payment_date < CM.fecha_eomonth) AND (DP."FECHA CANCELACION" IS NOT NULL) AND (DP."FECHA CANCELACION" > CM.fecha_eomonth)) THEN DATE_DIFF('day', DP.e_payment_date, CM.fecha_eomonth) WHEN (DP."FECHA CANCELACION" IS NULL) THEN DATE_DIFF('day', DP.e_payment_date, CM.fecha_eomonth) WHEN (DP."FECHA CANCELACION" < CM.fecha_eomonth) THEN 0 END) "dias_atraso"
    , (CASE WHEN ((cm.fecha_eomonth = DP.MES_DESEMBOLSO) AND (DP.moneda_del_monto_financiado = 'PEN')) THEN dp.monto_financiado WHEN ((cm.fecha_eomonth = DP.MES_DESEMBOLSO) AND (DP.moneda_del_monto_financiado = 'USD')) THEN (dp.monto_financiado * tc.exchange_rate) ELSE 0 END) m_desembolso_soles
-   
-   , (CASE  WHEN (dp."MES CANCELACION" = cm.fecha_eomonth) THEN 0
-            WHEN (DP.moneda_del_monto_financiado = 'PEN') AND (ncpt."NUEVO_CAPITAL" IS NOT NULL) THEN ROUND( ncpt."NUEVO_CAPITAL", 2) 
-            WHEN (DP.moneda_del_monto_financiado = 'USD') AND (ncpt."NUEVO_CAPITAL" IS NOT NULL) THEN ROUND((ncpt."NUEVO_CAPITAL" * tc.exchange_rate), 2)
-
-            WHEN (DP.moneda_del_monto_financiado = 'PEN') THEN ROUND(dp.monto_financiado, 2) 
-            WHEN (DP.moneda_del_monto_financiado = 'USD') THEN ROUND((dp.monto_financiado * tc.exchange_rate), 2) END) 
-            remaining_capital_soles   , (CASE WHEN (DP.moneda_del_monto_financiado = 'PEN') THEN dp.monto_financiado WHEN (DP.moneda_del_monto_financiado = 'USD') THEN (dp.monto_financiado * tc.exchange_rate) END) amount_financed_soles
+   , (CASE WHEN (dp."MES CANCELACION" = cm.fecha_eomonth) THEN 0 WHEN (DP.moneda_del_monto_financiado = 'PEN') THEN ROUND(dp.monto_financiado, 2) WHEN (DP.moneda_del_monto_financiado = 'USD') THEN ROUND((dp.monto_financiado * tc.exchange_rate), 2) END) remaining_capital_soles
+   , (CASE WHEN (DP.moneda_del_monto_financiado = 'PEN') THEN dp.monto_financiado WHEN (DP.moneda_del_monto_financiado = 'USD') THEN (dp.monto_financiado * tc.exchange_rate) END) amount_financed_soles
    , tc.exchange_rate exchange_rate
    , DATE_FORMAT(DP.Fecha_de_desembolso_hub, '%Y%m') codmes_transfer
    FROM
@@ -227,9 +191,7 @@ WHERE (dealstage = '1115970054')
    LEFT JOIN datos_planos DP ON (true AND (DP.MES_DESEMBOLSO <= CM.fecha_eomonth) AND (CM.fecha_eomonth <= COALESCE(DP."MES CANCELACION", ((date_trunc('month', current_date) + INTERVAL  '1' MONTH) - INTERVAL  '1' DAY)))))
    LEFT JOIN prod_datalake_analytics.tipo_cambio_jmontoya "TC" ON (cm.fecha_eomonth = TC.mes_tc))
    LEFT JOIN cobranza_agrupada CA ON ((CM.fecha_eomonth = CA.fecha_eomonth) AND (DP.Code = CA.c_digo_de_subasta)))
-   LEFT JOIN nuevo_capital_propagado_tabla AS NCPT ON (NCPT.CODE = DP.CODE) AND (CAST(NCPT.fecha_cierre AS DATE) = CAST(cm.fecha_eomonth AS DATE))
-)
-
+) 
 SELECT DISTINCT
   c1.*
 , (CASE WHEN (c1.dias_atraso > 0) THEN c1.remaining_capital ELSE 0 END) "PAR1_m"
