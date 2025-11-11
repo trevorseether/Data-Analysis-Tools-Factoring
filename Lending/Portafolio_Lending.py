@@ -122,48 +122,10 @@ def parse_dates(date_str):
     return pd.NaT
 
 df_ops['fecha_de_desembolso']    = df_ops['fecha_de_desembolso'].apply(parse_dates)
-
-#%%
-def parse_dates(date_str):
-    '''
-    Parameters
-    ----------
-    date_str : Es el formato que va a analizar dentro de la columna del DataFrame.
-
-    Returns
-    -------
-    Si el date_str tiene una estructura compatible con los formatos preestablecidos
-    para su iteración, la convertirá en un DateTime
-
-    '''
-    #formatos en los cuales se tratará de convertir a DateTime
-    formatos = ['%Y-%d-%m %H:%M:%S'    ,
-                '%d-%m-%Y %H:%M:%S'    ,
-                '%d-%m-%Y'             ,
-                '%d/%m/%Y %H:%M:%S'    ,
-                '%d/%m/%Y'             ,
-                '%Y-%m-%d %H:%M:%S'    ,
-                '%Y%m%d', '%Y-%m-%d'   , 
-                '%Y-%m-%d %H:%M:%S'    , 
-                '%Y/%m/%d %H:%M:%S'    ,
-                '%Y-%m-%d %H:%M:%S PM' ,
-                '%Y-%m-%d %H:%M:%S AM' ,
-                '%Y/%m/%d %H:%M:%S PM' ,
-                '%Y/%m/%d %H:%M:%S AM'     ]
-
-    for formato in formatos:
-        try:
-            return pd.to_datetime(date_str, format=formato)
-        except ValueError:
-            pass
-    return pd.NaT
-
+df_ops['fecha_de_finalizacion'] = df_ops['fecha_de_finalizacion'].apply(parse_dates)
 
 bd_pagos['Fecha de pago del cliente'] = bd_pagos['Fecha de pago del cliente'].apply(parse_dates)
-# bd_pagos['Fecha de pago del cliente'][12]
 bd_pagos['Fecha de pago del cliente'] = pd.to_datetime(bd_pagos['Fecha de pago del cliente'])
-
-df_ops['fecha_de_finalizacion'] = df_ops['fecha_de_finalizacion'].apply(parse_dates)
 
 #%% Fecha finalización de la operación
 # cálculo para validaciones sacando la máxima fecha del BD_PAGOS
@@ -173,7 +135,7 @@ fecha_fin = bd_pagos.pivot_table(values  = 'Fecha de pago del cliente',
 df_ops = df_ops.merge(fecha_fin,
                       left_on   = 'codigo_de_prestamo',
                       right_on  = 'Codigo de prestamo',
-                      how = 'left')
+                      how       = 'left')
 
 df_ops['fecha_de_finalizacion'] = df_ops['fecha_de_finalizacion'].fillna('')
 df_ops['fecha_de_finalizacion'] = df_ops['fecha_de_finalizacion'].astype(str).str.replace('NaT', '')

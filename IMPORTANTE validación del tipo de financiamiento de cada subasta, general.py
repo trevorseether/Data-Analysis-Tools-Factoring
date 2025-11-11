@@ -207,15 +207,15 @@ import pandas as pd
 
 
 # cartera
-data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202509) 18-10-2025.xlsx')
+data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202510) 10-11-2025.xlsx')
 data['Codigo de Subasta'] = data['Codigo de Subasta'].str.lower()
 
 # cosecha propia
-cosecha = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA cosecha factoring (202509) 18-10-2025.xlsx')
+cosecha = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA cosecha factoring (202510) 10-11-2025.xlsx')
 cosecha['Codigo de Subasta'] = cosecha['Codigo de Subasta'].str.lower()
 
 
-proporciones = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/tipo financiamiento online 202509.xlsx')
+proporciones = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/tipo financiamiento online 202510.xlsx')
 proporciones['CODE'] = proporciones['CODE'].str.lower()
 proporciones = proporciones.drop_duplicates(subset=['CODE'], keep='first')
 proporciones = proporciones[['CODE', 'CROWD', 'GESTORA', 'ONBALANCE']]

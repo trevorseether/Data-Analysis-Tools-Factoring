@@ -17,7 +17,7 @@ from dateutil.relativedelta import relativedelta
 from unidecode import unidecode
 
 import os
-os.chdir(r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202508 news')
+os.chdir(r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202509 news')
 
 def sum_date(codmes,months):
 
@@ -25,7 +25,7 @@ def sum_date(codmes,months):
     return datetime.strftime(temp,'%Y%m')
 
 #%%
-cierre = '202508'
+cierre = '202509'
 fecha_cierre = pd.to_datetime(cierre, format='%Y%m') + pd.offsets.MonthEnd(0)
 
 from datetime import datetime, timezone, timedelta

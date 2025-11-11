@@ -21,11 +21,11 @@ def sum_date(codmes,months):
     temp = datetime.strptime(codmes, '%Y%m') + relativedelta(months=months)
     return datetime.strftime(temp,'%Y%m')
 
-cierre = '202508'
+cierre = '202509'
 fecha_cierre = pd.to_datetime(cierre, format='%Y%m') + pd.offsets.MonthEnd(0)
 
-pd.set_option('display.max_columns', None)
-pd.set_option('display.max_colwidth', None)
+# pd.set_option('display.max_columns', None)
+# pd.set_option('display.max_colwidth', None)
 
 #%%
 # BD PAGOS
@@ -55,6 +55,8 @@ bd_pagos_finalizados_last_cierre = pd.read_excel('G:/.shortcut-targets-by-id/103
                                                  sheet_name='Hoja2')
 bd_pagos_finalizados_last_cierre['Codigo Operación'] = bd_pagos_finalizados_last_cierre['Codigo Operación'].str.upper()
 
+bd_pagos_finalizados_last_cierre = bd_pagos_finalizados_last_cierre[ ~bd_pagos_finalizados_last_cierre['Codigo Operación'].isin(list(bd_pagos_last_cierre['Codigo Operación']))]
+
 #%%
 bd_pagos_finalizados= bd_pagos_finalizados[~(bd_pagos_finalizados['Codigo Operación'].isna())]
 bd_pagos_finalizados_last_cierre = bd_pagos_finalizados_last_cierre[~(bd_pagos_finalizados_last_cierre['Codigo Operación'].isna())]
@@ -69,6 +71,7 @@ print(len(temp_new_loans['Codigo Operación'].unique()))
 
 temp_new_loans.to_excel(fr'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\temp_new_loans_{cierre}.xlsx', index=False)
 
+aver = temp_new_loans[temp_new_loans['Codigo Contrato'] == 'P03593' ]
 #%%#%%
 def check_if_finished(my_column):
     # print(type(my_column))
