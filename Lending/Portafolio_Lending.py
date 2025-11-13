@@ -25,6 +25,8 @@ from pyathena import connect
 #%%
 fecha_corte = '2025-11-30'
 
+crear_excels = False # True o False
+
 #%% Credenciales de AmazonAthena
 with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
     creds = json.load(f)
@@ -35,8 +37,8 @@ conn = connect(
     aws_session_token     = creds["SessionToken"],
     s3_staging_dir        = creds["s3_staging_dir"],
     region_name           = creds["region_name"]
-    
     )
+
 #%% ops
 df_ops = pd.read_excel(r'G:/Mi unidad/BD_Cobranzas.xlsm',
                        sheet_name= 'Prestamos gestionados',
@@ -129,9 +131,18 @@ bd_pagos['Fecha de pago del cliente'] = pd.to_datetime(bd_pagos['Fecha de pago d
 
 #%% Fecha finalización de la operación
 # cálculo para validaciones sacando la máxima fecha del BD_PAGOS
-fecha_fin = bd_pagos.pivot_table(values  = 'Fecha de pago del cliente',
-                                 index   = 'Codigo de prestamo',
-                                 aggfunc = 'max').reset_index()
+bd_pagos['flag_finalizado'] = (
+    bd_pagos
+    .groupby('Codigo de prestamo')['Status de cuota']
+    .transform(lambda x: (x == 'FINALIZADO').all())
+)
+# obtenemos solo las ops finalizadas
+bd_pagos_finalizados = bd_pagos[bd_pagos['flag_finalizado'] == True]
+del bd_pagos['flag_finalizado']
+
+fecha_fin = bd_pagos_finalizados.pivot_table( values  = 'Fecha de pago del cliente',
+                                              index   = 'Codigo de prestamo',
+                                              aggfunc = 'max').reset_index()
 df_ops = df_ops.merge(fecha_fin,
                       left_on   = 'codigo_de_prestamo',
                       right_on  = 'Codigo de prestamo',
@@ -147,7 +158,6 @@ df_ops['validación fecha de finalizacion'] = np.where(df_ops['fecha_de_finaliza
                                                       'alerta',
                                                       '')
 alerta = df_ops[ df_ops['validación fecha de finalizacion'] == 'alerta' ]
-
 if alerta.shape[0] > 0:
     print('alerta de casos raros')
     print(alerta)
@@ -315,7 +325,10 @@ df_temp['Saldo a favor']            = df_temp['Saldo a favor'].fillna(0)
 
 del df_temp['Codigo de prestamo']
 
-#%% solarizando 
+#%% solarizando
+
+
+
 #%% cálculo de saldo capital
 df_temp['Saldo Capital'] = np.where(df_temp['aux col filtrado'] == 'finalizado',
                                     0,
@@ -335,8 +348,8 @@ df_minima_fecha_pago_vigente = df_fechas.assign(key = 1).merge(pagos_pendientes.
 
 df_minima_fecha_pago_vigente = df_minima_fecha_pago_vigente[ ~(df_minima_fecha_pago_vigente['Fecha de pago del cliente'] < df_minima_fecha_pago_vigente['Fecha_corte'])]
 
-prox_fecha_pago = df_minima_fecha_pago_vigente.pivot_table(index = ['Fecha_corte', 'Codigo de prestamo'],
-                                                           values = 'Fecha de pago esperada original',
+prox_fecha_pago = df_minima_fecha_pago_vigente.pivot_table(index   = ['Fecha_corte', 'Codigo de prestamo'],
+                                                           values  = 'Fecha de pago esperada original',
                                                            aggfunc = 'min').reset_index()
 prox_fecha_pago.rename(columns = {'Fecha de pago esperada original' : 'fecha proximo pago'},
                        inplace = True)
@@ -376,6 +389,46 @@ df_temp['q_desembolso'] = np.where(df_temp['mes_desembolso'] == df_temp['Fecha_c
 
 df_temp['m_desembolso'] = np.where(df_temp['mes_desembolso'] == df_temp['Fecha_corte'], df_temp['monto_prestado'], 0)
 
+#%% cálculo de provisiones
+# primero que nada columna de Clasificación
+dias_atraso_nulos = df_temp[ pd.isna(df_temp['dias atraso'])]
+if dias_atraso_nulos.shape[0] > 0:
+    print('alerta, casos sin días de atraso')
+
+def clasificacion(df):
+    if df['dias atraso'] <= 8:
+        return 'Normal'
+    if df['dias atraso'] <= 30:
+        return 'CPP'
+    if df['dias atraso'] <= 60:
+        return 'Deficiente'
+    if df['dias atraso'] <= 120:
+        return 'Dudoso'
+    else:
+        return 'Pérdida'
+df_temp['Clasificacion'] = df_temp.apply(clasificacion, axis = 1)
+
+def porcentaje_provision(df):
+    if df['dias atraso'] <= 8:
+        return 0.01
+    if df['dias atraso'] <= 30:
+        return 0.05
+    if df['dias atraso'] <= 60:
+        return 0.25
+    if df['dias atraso'] <= 120:
+        return 0.60
+    else:
+        return 1
+df_temp['% Provision'] = df_temp.apply(porcentaje_provision, axis = 1)
+
+df_temp['Provision'] = df_temp['% Provision'] * df_temp['Saldo Capital']
+df_temp['Provision'] = round( df_temp['Provision'], 2)
+########## flag castigo #######################################################
+
+df_temp['flag_castigo_>50'] = np.where(df_temp['dias atraso'] > 150,
+                                       'castigo',
+                                       '')
+
 #%% ordenamiento PENDIENTE
 
 #%% CARGA AL LAKE
@@ -409,10 +462,11 @@ s3.put_object(Bucket  = bucket_name,
 
 print(f"✅ Archivo subido a s3://{bucket_name}/{s3_key}")
 
-df_temp.to_csv('portafolio_lending_v1.csv',
-               index    = 'False',
-               sep      = ',',
-               encoding = 'utf-8-sig')
+if crear_excels == True:
+    df_temp.to_csv('portafolio_lending_v1.csv',
+                   index    = 'False',
+                   sep      = ',',
+                   encoding = 'utf-8-sig')
 
 #%%
 # =============================================================================
@@ -487,9 +541,10 @@ cosecha['m_desembolso'] = np.where(cosecha['Fecha_corte'] <= cosecha['fecha_de_d
                                    0)
 
 #%%
-cosecha.to_csv('cosecha_lending_v1.csv',
-               encoding = 'utf-8-sig',
-               index = False,
-               sep = ',')
+if crear_excels == True:
+    cosecha.to_csv('cosecha_lending_v1.csv',
+                   encoding = 'utf-8-sig',
+                   index = False,
+                   sep = ',')
 
 
