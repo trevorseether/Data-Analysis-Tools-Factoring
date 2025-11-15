@@ -7,16 +7,19 @@ Created on Thu Aug 14 15:43:33 2025
 
 import pandas as pd
 
-df = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/parchamiento de fac outstanding/fac outst.xlsx')
+df = pd.read_excel(r'G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a/BUSINESS ANALYTICS/FACTORING/COMISIONES/Ejecutivos Factoring/fac_ejecutivos.xlsx',
+                   sheet_name = 'Ejecutivos',
+                   dtype = str)
+df
 
-df.to_csv("C:/Users/Joseph Montoya/Desktop/pruebas/parchamiento de fac outstanding/fac outst.csv", 
+df.to_csv(r"G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a/BUSINESS ANALYTICS/FACTORING/COMISIONES/Ejecutivos Factoring/fac_ejecutivos.csv", 
           sep = ",", 
           index     = False, 
           encoding  = "utf-8-sig")
 
 #%%%
 # el nombre del csv, también debe ser el nombre de la carpeta
-nombre_csv = 'portafolio_lending_v1'
+nombre_csv = 'fac_ejecutivos'
 
 df = pd.read_csv(r'G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a/BUSINESS ANALYTICS/FACTORING/PROYECTOS/scripts Joseph/Lending/portafolio_lending_v1',
                  delimiter = ',')

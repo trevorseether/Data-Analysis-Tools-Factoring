@@ -25,7 +25,7 @@ from pyathena import connect
 #%%
 fecha_corte = '2025-11-30'
 
-crear_excels = False # True o False
+crear_excels = True # True o False
 
 #%% Credenciales de AmazonAthena
 with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
