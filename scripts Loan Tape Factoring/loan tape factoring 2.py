@@ -244,6 +244,12 @@ column_names = [desc[0] for desc in cursor.description]
 # Convertir los resultados a un DataFrame de pandas
 df = pd.DataFrame(resultados, columns = column_names)
 
+#%% ajuste total_loan_amount
+print('revisar el cáculo de total_loan_amount')
+print('de momento se soluciona a la fuerza')
+
+# df['total_loan_amount'] =
+
 #%% casteo de fechas
 df['begin_date']             = pd.to_datetime(df['begin_date'], format='%Y-%m-%d')
 df['original_maturity_date'] = pd.to_datetime(df['original_maturity_date'], format='%Y-%m-%d')
@@ -341,6 +347,8 @@ repayments.columns = ['loan_id',
                       'warranty_amount',
                       'paid_date']
 
+print('revisar esta lógica')
+repayments['amount'] = repayments['principal_amount'] + repayments['interest_amount'] + repayments['warranty_amount']
 # repayments.to_excel('./loan_schedules_202506.xlsx', index=False)
 
 #%%
