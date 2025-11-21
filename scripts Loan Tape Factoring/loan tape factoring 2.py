@@ -359,38 +359,219 @@ repayments['amount'] = repayments['principal_amount'] + repayments['interest_amo
 # =============================================================================
 # query 2
 # =============================================================================
-query = f'''
-with client_payments_1 as (
-	SELECT *,
+# query = f''' query antigua que ya no se usa
+# with client_payments_1 as (
+# 	SELECT *,
+# 		CASE
+# 			WHEN currency != distribution_provider_currency_distribution
+# 			AND distribution_provider_currency_distribution = 'USD' THEN 'pen2usd'
+# 			WHEN currency != distribution_provider_currency_distribution
+# 			AND distribution_provider_currency_distribution = 'PEN' THEN 'usd2pen' ELSE 'mantain'
+# 		END AS amount_paid_exchange_flag,
+# 		CASE
+# 			WHEN distribution_provider_currency_amount_bussinesman != distribution_provider_currency_distribution
+# 			AND distribution_provider_currency_distribution = 'USD' THEN 'pen2usd'
+# 			WHEN distribution_provider_currency_amount_bussinesman != distribution_provider_currency_distribution
+# 			AND distribution_provider_currency_distribution = 'PEN' THEN 'usd2pen' ELSE 'mantain'
+# 		END AS guarantee_exchange_flag,
+# 		CASE
+# 			WHEN coalesce(distribution_provider_amount_bussinesman, 0) > 0 THEN distribution_provider_amount_bussinesman
+# 			WHEN coalesce(pay_order_businessman_amount, 0) > 0
+# 			AND coalesce(distribution_provider_igv, 0) > 0 THEN 0
+# 			WHEN coalesce(pay_order_businessman_amount, 0) > 0
+# 			AND coalesce(distribution_provider_igv, 0) = 0 THEN pay_order_businessman_amount ELSE 0
+# 		END AS guarantee_paid
+# 	FROM prod_datalake_analytics.fac_client_payment_payments
+# ),
+# client_payments_2 as (
+# 	SELECT a.guarantee_exchange_flag,
+# 		CASE
+# 			WHEN cardinality(a.distribution) = 0 THEN 'new' ELSE 'old'
+# 		END AS flag,
+# 		a.created_at,
+# 		b.auction_code,
+# 		b.auction_currency,
+# 		b.status,
+# 		a.payment_type,
+# 		a._id as payment_id,
+# 		a.client_payment_id,
+# 		CASE
+# 			WHEN amount_paid_exchange_flag = 'usd2pen' THEN coalesce(
+# 				round(a.amount * a.distribution_provider_rate, 2),
+# 				0
+# 			)
+# 			WHEN amount_paid_exchange_flag = 'pen2usd' THEN coalesce(
+# 				round(a.amount / a.distribution_provider_rate, 2),
+# 				0
+# 			) ELSE a.amount
+# 		END AS original_amount_paid,
+# 		a.distribution_provider_currency_distribution as currency_distribution,
+# 		a.distribution_provider_amount_payment_client as client_amount_paid,
+# 		CASE
+# 			WHEN coalesce(pay_order_businessman_amount, 0) > 0
+# 			AND coalesce(distribution_provider_igv, 0) > 0 THEN coalesce(a.distribution_provider_interes_payment, 0) + coalesce(distribution_provider_igv, 0)
+# 			WHEN coalesce(pay_order_businessman_amount, 0) = 0
+# 			AND coalesce(distribution_provider_igv, 0) > 0 THEN coalesce(a.distribution_provider_interes_payment, 0) + coalesce(distribution_provider_igv, 0)
+# 			WHEN coalesce(a.distribution_provider_interes_payment, 0) = 0
+# 			AND coalesce(
+# 				a.distribution_provider_amount_capital_payment,
+# 				0
+# 			) = 0
+# 			AND coalesce(guarantee_paid = 0) THEN a.distribution_provider_interes ELSE coalesce(a.distribution_provider_interes_payment, 0)
+# 		END as interest_paid,
+# 		CASE
+# 			WHEN coalesce(a.distribution_provider_interes_payment, 0) = 0
+# 			AND coalesce(
+# 				a.distribution_provider_amount_capital_payment,
+# 				0
+# 			) = 0
+# 			AND coalesce(guarantee_paid, 0) = 0 THEN a.distribution_provider_capital_with_interes - a.distribution_provider_interes ELSE a.distribution_provider_amount_capital_payment
+# 		END AS capital_paid,
+# 		CASE
+# 			WHEN guarantee_exchange_flag = 'usd2pen' THEN coalesce(
+# 				round(
+# 					a.guarantee_paid * a.distribution_provider_rate,
+# 					2
+# 				),
+# 				0
+# 			)
+# 			WHEN guarantee_exchange_flag = 'pen2usd' THEN coalesce(
+# 				round(
+# 					a.guarantee_paid / a.distribution_provider_rate,
+# 					2
+# 				),
+# 				0
+# 			) ELSE coalesce(guarantee_paid, 0)
+# 		END AS guarantee_paid,
+# 		CAST(
+# 			from_iso8601_timestamp(
+# 				REPLACE(
+# 					SUBSTRING(CAST(a.date AS varchar), 1, 19),
+# 					' ',
+# 					'T'
+# 				)
+# 			) AS DATE
+# 		) as payment_date,
+# 		max(
+# 			CAST(
+# 				from_iso8601_timestamp(
+# 					REPLACE(
+# 						SUBSTRING(CAST(a.date AS varchar), 1, 19),
+# 						' ',
+# 						'T'
+# 					)
+# 				) AS DATE
+# 			)
+# 		) OVER (PARTITION BY b.auction_code) AS last_paid_date,
+# 		CAST(
+# 			date_format(
+# 				date_parse(
+# 					replace(CAST(a.date AS varchar), '.000', ''),
+# 					'%Y-%m-%d %H:%i:%s'
+# 				),
+# 				'%Y%m'
+# 			) AS int
+# 		) AS codmes,
+# 		distribution_provider_amount_bussinesman,
+# 		pay_order_businessman_amount,
+# 		distribution_provider_igv
+# 	FROM client_payments_1 a
+# 		LEFT JOIN prod_datalake_analytics.fac_client_payments b on a.client_payment_id = b._id
+# )
+# SELECT auction_code as loan_id,
+# 	payment_id,
+# 	payment_date as "date",
+# 	CASE
+# 		WHEN auction_currency = 'USD' THEN (interest_paid + capital_paid + guarantee_paid) * b.exchange_rate ELSE (interest_paid + capital_paid + guarantee_paid)
+# 	END AS amount,
+# 	CASE
+# 		WHEN auction_currency = 'USD' THEN capital_paid * b.exchange_rate ELSE capital_paid
+# 	END AS principal_amount,
+# 	CASE
+# 		WHEN auction_currency = 'USD' THEN interest_paid * b.exchange_rate ELSE interest_paid 
+# 	END AS interest_amount,
+# 	CASE
+# 		WHEN auction_currency = 'USD' THEN guarantee_paid * b.exchange_rate ELSE guarantee_paid
+# 	END AS fee_amount,
+# 	'' AS penalty_amount,
+# 	'' AS payment_mode,
+# 	'' AS payment_source,
+# 	'' AS payment_source_payment_id
+# FROM client_payments_2 a --17,528
+# 	left join prod_datalake_analytics.tipo_cambio_jmontoya b on cast(b.tc_codmes as int) = a.codmes
+# where a.codmes <= {cierre}
+# ORDER BY payment_date  
+
+
+# '''
+
+
+
+
+
+
+query = f''' 
+with tipo_de_cambio AS (
+	SELECT
+		DATE_FORMAT(tc_date, '%Y%m') mes,
+		tc_contable,
+		ROW_NUMBER() OVER (
+			PARTITION BY DATE_FORMAT(tc_date, '%Y%m')
+			ORDER BY
+				tc_date DESC
+		) fila
+	FROM
+		"prod_datalake_master"."prestamype__tc_contable"
+),
+tipo_de_cambio_mes as (
+	select
+		mes,
+		tc_contable
+	from
+		tipo_de_cambio
+	where
+		fila = 1
+	order by
+		mes desc
+),
+client_payments_1 as (
+	SELECT
+		*,
 		CASE
 			WHEN currency != distribution_provider_currency_distribution
 			AND distribution_provider_currency_distribution = 'USD' THEN 'pen2usd'
 			WHEN currency != distribution_provider_currency_distribution
-			AND distribution_provider_currency_distribution = 'PEN' THEN 'usd2pen' ELSE 'mantain'
+			AND distribution_provider_currency_distribution = 'PEN' THEN 'usd2pen'
+			ELSE 'mantain'
 		END AS amount_paid_exchange_flag,
 		CASE
 			WHEN distribution_provider_currency_amount_bussinesman != distribution_provider_currency_distribution
 			AND distribution_provider_currency_distribution = 'USD' THEN 'pen2usd'
 			WHEN distribution_provider_currency_amount_bussinesman != distribution_provider_currency_distribution
-			AND distribution_provider_currency_distribution = 'PEN' THEN 'usd2pen' ELSE 'mantain'
+			AND distribution_provider_currency_distribution = 'PEN' THEN 'usd2pen'
+			ELSE 'mantain'
 		END AS guarantee_exchange_flag,
 		CASE
 			WHEN coalesce(distribution_provider_amount_bussinesman, 0) > 0 THEN distribution_provider_amount_bussinesman
 			WHEN coalesce(pay_order_businessman_amount, 0) > 0
 			AND coalesce(distribution_provider_igv, 0) > 0 THEN 0
 			WHEN coalesce(pay_order_businessman_amount, 0) > 0
-			AND coalesce(distribution_provider_igv, 0) = 0 THEN pay_order_businessman_amount ELSE 0
+			AND coalesce(distribution_provider_igv, 0) = 0 THEN pay_order_businessman_amount
+			ELSE 0
 		END AS guarantee_paid
-	FROM prod_datalake_analytics.fac_client_payment_payments
+	FROM
+		prod_datalake_analytics.fac_client_payment_payments
 ),
 client_payments_2 as (
-	SELECT a.guarantee_exchange_flag,
+	SELECT
+		a.guarantee_exchange_flag,
 		CASE
-			WHEN cardinality(a.distribution) = 0 THEN 'new' ELSE 'old'
+			WHEN cardinality(a.distribution) = 0 THEN 'new'
+			ELSE 'old'
 		END AS flag,
 		a.created_at,
 		b.auction_code,
-		b.auction_currency,
+		fac_auctions.currency auction_currency,
 		b.status,
 		a.payment_type,
 		a._id as payment_id,
@@ -403,7 +584,8 @@ client_payments_2 as (
 			WHEN amount_paid_exchange_flag = 'pen2usd' THEN coalesce(
 				round(a.amount / a.distribution_provider_rate, 2),
 				0
-			) ELSE a.amount
+			)
+			ELSE a.amount
 		END AS original_amount_paid,
 		a.distribution_provider_currency_distribution as currency_distribution,
 		a.distribution_provider_amount_payment_client as client_amount_paid,
@@ -417,7 +599,8 @@ client_payments_2 as (
 				a.distribution_provider_amount_capital_payment,
 				0
 			) = 0
-			AND coalesce(guarantee_paid = 0) THEN a.distribution_provider_interes ELSE coalesce(a.distribution_provider_interes_payment, 0)
+			AND coalesce(guarantee_paid = 0) THEN a.distribution_provider_interes
+			ELSE coalesce(a.distribution_provider_interes_payment, 0)
 		END as interest_paid,
 		CASE
 			WHEN coalesce(a.distribution_provider_interes_payment, 0) = 0
@@ -425,7 +608,8 @@ client_payments_2 as (
 				a.distribution_provider_amount_capital_payment,
 				0
 			) = 0
-			AND coalesce(guarantee_paid, 0) = 0 THEN a.distribution_provider_capital_with_interes - a.distribution_provider_interes ELSE a.distribution_provider_amount_capital_payment
+			AND coalesce(guarantee_paid, 0) = 0 THEN a.distribution_provider_capital_with_interes - a.distribution_provider_interes
+			ELSE a.distribution_provider_amount_capital_payment
 		END AS capital_paid,
 		CASE
 			WHEN guarantee_exchange_flag = 'usd2pen' THEN coalesce(
@@ -441,7 +625,8 @@ client_payments_2 as (
 					2
 				),
 				0
-			) ELSE coalesce(guarantee_paid, 0)
+			)
+			ELSE coalesce(guarantee_paid, 0)
 		END AS guarantee_paid,
 		CAST(
 			from_iso8601_timestamp(
@@ -475,33 +660,44 @@ client_payments_2 as (
 		distribution_provider_amount_bussinesman,
 		pay_order_businessman_amount,
 		distribution_provider_igv
-	FROM client_payments_1 a
+	FROM
+		client_payments_1 a
 		LEFT JOIN prod_datalake_analytics.fac_client_payments b on a.client_payment_id = b._id
+		left join prod_datalake_analytics.fac_auctions fac_auctions on fac_auctions._id = b.auction_id
 )
-SELECT auction_code as loan_id,
+SELECT
+	auction_code as loan_id,
 	payment_id,
 	payment_date as "date",
+	auction_currency,
 	CASE
-		WHEN auction_currency = 'USD' THEN (interest_paid + capital_paid + guarantee_paid) * b.exchange_rate ELSE (interest_paid + capital_paid + guarantee_paid)
+		WHEN auction_currency = 'USD' THEN (interest_paid + capital_paid + guarantee_paid) * b.exchange_rate
+		ELSE (interest_paid + capital_paid + guarantee_paid)
 	END AS amount,
 	CASE
-		WHEN auction_currency = 'USD' THEN capital_paid * b.exchange_rate ELSE capital_paid
+		WHEN auction_currency = 'USD' THEN capital_paid * b.exchange_rate
+		ELSE capital_paid
 	END AS principal_amount,
 	CASE
-		WHEN auction_currency = 'USD' THEN interest_paid * b.exchange_rate ELSE interest_paid 
+		WHEN auction_currency = 'USD' THEN interest_paid * b.exchange_rate
+		ELSE interest_paid
 	END AS interest_amount,
 	CASE
-		WHEN auction_currency = 'USD' THEN guarantee_paid * b.exchange_rate ELSE guarantee_paid
+		WHEN auction_currency = 'USD' THEN guarantee_paid * b.exchange_rate
+		ELSE guarantee_paid
 	END AS fee_amount,
 	'' AS penalty_amount,
 	'' AS payment_mode,
 	'' AS payment_source,
 	'' AS payment_source_payment_id
-FROM client_payments_2 a --17,528
+FROM
+	client_payments_2 a --17,528
 	left join prod_datalake_analytics.tipo_cambio_jmontoya b on cast(b.tc_codmes as int) = a.codmes
-where a.codmes <= {cierre}
-ORDER BY payment_date  
-
+where
+	cast(a.codmes as int) <= cast({cierre} as int)
+	--and auction_code = '0mVyLU8c'
+ORDER BY
+	payment_date
 
 '''
 
