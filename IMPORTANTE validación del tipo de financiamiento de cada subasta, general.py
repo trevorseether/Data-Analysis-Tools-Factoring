@@ -250,9 +250,12 @@ data['suma'] = data['CROWD'] + data['GESTORA'] + data['ONBALANCE']
 data['suma'] = data['suma'].fillna(0)
 
 import numpy as np
-data['CROWD']  = np.where(data['suma'] == 0,
+data['GESTORA']  = np.where(data['suma'] == 0,
                           data['amount_financed_soles'],
                           data['CROWD'])
+
+
+
 data['suma'] = data['CROWD'] + data['GESTORA'] + data['ONBALANCE']
 
 data['crowd %']      = data['CROWD'] / data['suma']
@@ -268,6 +271,7 @@ for columna in ['amount_financed_soles', 'Saldo Capital soles']:
     data[f'gestora_{columna}']   = data[columna] * data['gestora %']
     data[f'onbalance_{columna}'] = data[columna] * data['onbalance %']
 
+print('si está vacío, debe ser gestora')
 #%%
 cosecha = cosecha[['Codigo de Subasta']]
 

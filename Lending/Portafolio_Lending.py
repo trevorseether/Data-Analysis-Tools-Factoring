@@ -78,7 +78,7 @@ bd_pagos = pd.read_excel(r'G:/Mi unidad/BD_Cobranzas.xlsm',
                                    'Fecha de pago del cliente' : str}
                          )
 
-bd_pagos['Monto pagado']       = bd_pagos['Monto pagado'].fillna(0).astype(float)
+bd_pagos['TOTAL DE LA CUOTA PAGADA'] = bd_pagos['TOTAL DE LA CUOTA PAGADA'].fillna(0).astype(float)
 bd_pagos['Capital pagado']     = bd_pagos['Capital pagado'].fillna(0).astype(float)
 bd_pagos['Intereses generado'] = bd_pagos['Intereses generado'].fillna(0).astype(float)
 bd_pagos['Monto moratorio']    = bd_pagos['Monto moratorio'].fillna(0).astype(float)
@@ -279,7 +279,7 @@ df_o = df_temp[['Fecha_corte', 'codigo_de_prestamo']]
 df_cortes_ops = df_o.copy() 
 
 df_o = df_o.merge(bd_pagos[['Codigo de prestamo', 
-                            'Monto pagado', 
+                            'TOTAL DE LA CUOTA PAGADA', 
                             'Capital pagado', 
                             'Intereses generado', 
                             'Monto moratorio',
@@ -293,7 +293,7 @@ df_o = df_o.merge(bd_pagos[['Codigo de prestamo',
 df_o = df_o[df_o['Fecha de pago del cliente'] <= df_o['Fecha_corte']]
 # 
 pivot_pagos = df_o.pivot_table(index = ['Fecha_corte', 'codigo_de_prestamo'],
-                               values = ['Monto pagado', 
+                               values = ['TOTAL DE LA CUOTA PAGADA', 
                                          'Capital pagado', 
                                          'Intereses generado', 
                                          'Monto moratorio',
@@ -317,7 +317,7 @@ df_temp = df_temp.merge(cap_original,
                         right_on = 'Codigo de prestamo',
                         how      = 'left')
 
-df_temp['Monto pagado']             = df_temp['Monto pagado'].fillna(0)
+df_temp['TOTAL DE LA CUOTA PAGADA'] = df_temp['TOTAL DE LA CUOTA PAGADA'].fillna(0)
 df_temp['Capital pagado']           = df_temp['Capital pagado'].fillna(0)
 df_temp['Interes pagado']           = df_temp['Interes pagado'].fillna(0)
 df_temp['Interes moratorio pagado'] = df_temp['Interes moratorio pagado'].fillna(0)
@@ -425,11 +425,12 @@ df_temp['Provision'] = df_temp['% Provision'] * df_temp['Saldo Capital']
 df_temp['Provision'] = round( df_temp['Provision'], 2)
 ########## flag castigo #######################################################
 
-df_temp['flag_castigo_>50'] = np.where(df_temp['dias atraso'] > 150,
+df_temp['flag_castigo_>150'] = np.where(df_temp['dias atraso'] > 150,
                                        'castigo',
                                        '')
 
 #%% ordenamiento PENDIENTE
+
 
 #%% CARGA AL LAKE
 # Cliente de S3

@@ -15,7 +15,6 @@ from dateutil.relativedelta import relativedelta
 from unidecode import unidecode
 
 import os
-os.chdir(r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202509 existing')
 
 def sum_date(codmes,months):
 
@@ -23,13 +22,20 @@ def sum_date(codmes,months):
     return datetime.strftime(temp,'%Y%m')
 
 #%%
-cierre = '202509'
+cierre = '202510'
+ubi = r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202510 existing'
+
 fecha_cierre = pd.to_datetime(cierre, format='%Y%m') + pd.offsets.MonthEnd(0)
 
 from datetime import datetime, timezone, timedelta
 peru_tz = timezone(timedelta(hours=-5))
 today_date = datetime.now(peru_tz).strftime('%Y%m%d')
 
+#%% creación de ubicaciones
+# Crea la carpeta si no existe
+os.makedirs(ubi, exist_ok=True)
+
+os.chdir(ubi)
 #%%
 bd_operaciones  = pd.read_excel(r"G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/archivos/BD_Operaciones.xlsx")
 

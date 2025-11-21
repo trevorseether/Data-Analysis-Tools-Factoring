@@ -24,15 +24,18 @@ from datetime import datetime
 hoy_formateado = datetime.today().strftime('%Y-%m-%d')
 
 #%%
-ubi = r'C:\Users\Joseph Montoya\Desktop\loans tape\2025 09'
+ubi = r'C:\Users\Joseph Montoya\Desktop\loans tape\2025 10' # se creará automáticamente
 
-cierre = 202509
+cierre = 202510
 
-crear_excel = False # True o False para crear excel
+crear_excel = True # True o False para crear excel
 
 upload_s3 = True # True o False para cargar a Amazon Athena
 
 #%%
+# Crea la carpeta si no existe
+os.makedirs(ubi, exist_ok=True)
+
 os.chdir(ubi)
 
 #%% Credenciales de AmazonAthena
