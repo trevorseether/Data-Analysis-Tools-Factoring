@@ -99,14 +99,14 @@ df['Fecha_vencimiento'] = pd.to_datetime(df['Fecha_vencimiento']).dt.date
 df['fecha'] = pd.to_datetime(df['fecha']).dt.date
 
 #%%
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 ################################################################################
 # Hora actual en Perú (UTC-5)
 now = datetime.now(ZoneInfo("America/Lima"))
 
 # Guardar directamente el objeto datetime
-df["_timestamp"] = now
+df["_timestamp"] = now - timedelta(hours=5)
 
 #%% 
 # pip install pyarrow

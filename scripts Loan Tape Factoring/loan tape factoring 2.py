@@ -967,8 +967,6 @@ for nombre_tabla, df in dataframes:
                   )
     
     print(f"✅ Archivo subido a s3://{bucket_name}/{s3_key}")
-    
-
 
 
 #%%

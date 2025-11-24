@@ -38,34 +38,47 @@ df = pd.read_excel(r'G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8
                    dtype = str)
 
 #%%
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+################################################################################
+# Hora actual en Perú (UTC-5)
+now = datetime.now(ZoneInfo("America/Lima"))
+
+# Guardar directamente el objeto datetime
+df["_timestamp"] = now - timedelta(hours=5)
+
+#%%
+nombre_tabla = 'fac_ejecutivos'
+
 # Cliente de S3
 s3 = boto3.client(
     "s3",
-    aws_access_key_id        = creds["AccessKeyId"],
-    aws_secret_access_key    = creds["SecretAccessKey"],
-    aws_session_token        = creds["SessionToken"],
-    region_name              = creds["region_name"]
+    aws_access_key_id     = creds["AccessKeyId"],
+    aws_secret_access_key = creds["SecretAccessKey"],
+    aws_session_token     = creds["SessionToken"],
+    region_name           = creds["region_name"]
 )
 
-# ==== CONFIGURACIÓN ==== 
-bucket_name = "prod-datalake-raw-730335218320" 
-s3_prefix = "manual/ba/fac_ejecutivos/" # carpeta lógica en el bucket 
+# ==== CONFIGURACIÓN ====
+bucket_name = "prod-datalake-sandbox-730335218320"
+s3_prefix   = f"{nombre_tabla}/"  # carpeta lógica en el bucket
 
 # ==== EXPORTAR A PARQUET EN MEMORIA ====
-csv_buffer = io.StringIO() 
-df.to_csv(csv_buffer, index=False, encoding="utf-8-sig") 
+parquet_buffer = io.BytesIO()
+df.to_parquet(parquet_buffer, index=False, engine="pyarrow")
+# también puedes usar engine="fastparquet" si lo prefieres
 
-# Nombre de archivo con timestamp (opcional, para histórico) 
-s3_key = f"{s3_prefix}fac_ejecutivos.csv" 
+# Nombre de archivo con timestamp (opcional)
+s3_key = f"{s3_prefix}{nombre_tabla}.parquet"
 
-# Subir directamente desde el buffer 
-s3.put_object(Bucket  = bucket_name, 
-              Key     = s3_key, 
-              Body    = csv_buffer.getvalue() 
-              )
+# Subir directamente desde el buffer
+s3.put_object(
+    Bucket = bucket_name,
+    Key    = s3_key,
+    Body   = parquet_buffer.getvalue()
+)
 
-print(f"✅ Archivo subido a s3://{bucket_name}/{s3_key}")
-
+print(f"✅ Archivo subido a s3://{bucket_name}{s3_key}")
 
 
 
