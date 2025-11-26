@@ -23,7 +23,7 @@ import io
 from pyathena import connect
 
 #%%
-fecha_corte = '2025-11-30'
+fecha_corte = '2025-12-31' # YYYY-MM-DD
 
 crear_excels = True # True o False
 
@@ -70,6 +70,7 @@ df_ops['codigo_de_prestamo'] = df_ops['codigo_de_prestamo'].str.strip()
 df_ops = df_ops.dropna(subset=['fecha_de_desembolso', 'moneda'])
 df_ops['nro_de_cuotas'] = df_ops['nro_de_cuotas'].astype(int)
 df_ops['dias_de_mora'] = df_ops['dias_de_mora'].fillna(0).astype(int)
+
 ###############################################################################
 bd_pagos = pd.read_excel(r'G:/Mi unidad/BD_Cobranzas.xlsm',
                          sheet_name = 'BD PAGOS',
@@ -179,6 +180,7 @@ fechas = pd.date_range(start = '2025-09-30',  # no tocar este valor
 # Crear un DataFrame con las fechas
 df_fechas = pd.DataFrame({'Fecha_corte': fechas})
 df_fechas['Fecha_corte'] = pd.to_datetime(df_fechas['Fecha_corte'])
+df_fechas['codmes']      = df_fechas['Fecha_corte'].dt.strftime('%Y%m')
 
 #%% Obtener tipo de cambio del mes
 query = '''
@@ -201,9 +203,9 @@ tc['mes_tc'] = pd.to_datetime(tc['mes_tc'])
 tc = tc[tc['mes_tc'].isin(df_fechas['Fecha_corte'])]
 
 df_fechas = df_fechas.merge(tc[['mes_tc', 'exchange_rate']],
-                            left_on = 'Fecha_corte',
+                            left_on  = 'Fecha_corte',
                             right_on = 'mes_tc',
-                            how = 'left'
+                            how      = 'left'
                             )
 
 df_fechas['exchange_rate'] = df_fechas['exchange_rate'].fillna(3.500)
@@ -216,6 +218,7 @@ query = '''
         codigo_de_negocio___tandia_lending as "codigo_de_prestamo", 
         CASE
             WHEN hubspot_owner_id = '407980810' THEN 'Priscila Quispe (pquispe@tandia.pe)'
+            WHEN hubspot_owner_id = '76146626'  THEN 'Priscila García (pgarcia@tandia.pe)'
             ELSE hubspot_owner_id
             END AS propietario_negocio
     FROM prod_datalake_master.hubspot__deal
@@ -373,6 +376,32 @@ df_temp['dias atraso'] = df_temp['dias atraso'].fillna(0)
 
 df_temp['dias atraso'] = np.maximum(df_temp['dias atraso'],0)
 
+#%% Rango días de atraso
+def rango_dias(df_temp):
+    if df_temp['dias atraso'] == 0:
+        return '0. 0'
+    if df_temp['dias atraso'] <= 8:
+        return '01. 1 - 8'
+    if df_temp['dias atraso'] <= 30:
+        return '02. 9 - 30'
+    if df_temp['dias atraso'] <= 60:
+        return '03. 31 - 60'
+    if df_temp['dias atraso'] <= 90:
+        return '04. 61 - 90'
+    if df_temp['dias atraso'] <= 120:
+        return '05. 91 - 120'
+    if df_temp['dias atraso'] <= 150:
+        return '06. 121 - 150'
+    if df_temp['dias atraso'] <= 240:
+        return '07. 151 - 240'
+    if df_temp['dias atraso'] <= 360:
+        return '08. 241 - 360'
+    if df_temp['dias atraso'] <= 1094:
+        return '09. 361 - 1,094'
+    if df_temp['dias atraso'] <= float('inf'):
+        return '10. > 1,094'
+df_temp['rango_dias_atraso'] = df_temp.apply(rango_dias, axis = 1)
+        
 #%% par 0, 15, 30, 60, 90, 120, 150, 180, 360
 df_temp['par 0']   = np.where(df_temp['dias atraso'] > 0,   df_temp['Saldo Capital'], 0)
 df_temp['par 15']  = np.where(df_temp['dias atraso'] > 15,  df_temp['Saldo Capital'], 0)
@@ -429,7 +458,7 @@ df_temp['flag_castigo_>150'] = np.where(df_temp['dias atraso'] > 150,
                                        'castigo',
                                        '')
 
-#%% ordenamiento PENDIENTE
+#%% ordenamiento NO NECESARIO
 
 
 #%% CARGA AL LAKE
@@ -444,7 +473,7 @@ s3 = boto3.client(
 
 # ==== CONFIGURACIÓN ==== 
 bucket_name = "prod-datalake-raw-730335218320" 
-s3_prefix = "manual/ba/portafolio_lending_v1/" # carpeta lógica en el bucket 
+s3_prefix = "manual/ba/portafolio_lending/" # carpeta lógica en el bucket 
 
 # ==== EXPORTAR A PARQUET EN MEMORIA ====
 csv_buffer = io.StringIO()
@@ -453,7 +482,7 @@ csv_buffer = io.StringIO()
 df_temp.to_csv(csv_buffer, index=False, encoding="utf-8-sig") 
 
 # Nombre de archivo con timestamp (opcional, para histórico) 
-s3_key = f"{s3_prefix}portafolio_lending_v1.csv" 
+s3_key = f"{s3_prefix}portafolio_lending.csv" 
 
 # Subir directamente desde el buffer 
 s3.put_object(Bucket  = bucket_name, 
@@ -463,9 +492,10 @@ s3.put_object(Bucket  = bucket_name,
 
 print(f"✅ Archivo subido a s3://{bucket_name}/{s3_key}")
 
+
 if crear_excels == True:
-    df_temp.to_csv('portafolio_lending_v1.csv',
-                   index    = 'False',
+    df_temp.to_csv(r'G:\.shortcut-targets-by-id\1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a\BUSINESS ANALYTICS\Lending\portafolio_lending\portafolio_lending.csv',
+                   index    = False,
                    sep      = ',',
                    encoding = 'utf-8-sig')
 
@@ -531,21 +561,22 @@ filtracion = filtracion[['Fecha_corte', 'codigo_de_contrato', 'Saldo Capital',
                          'par 30', 'par 60', 'par 90', 'par 120', 'par 150', 
                          'par 180', 'par 360']]
 
+filtracion['indice_compuesto'] = filtracion['Fecha_corte'].astype(str) + filtracion['codigo_de_contrato']
+filtracion = filtracion.drop_duplicates(subset = 'indice_compuesto')
+del filtracion['indice_compuesto']
+
 cosecha = cosecha.merge(filtracion,
-                         on = ['Fecha_corte', 'codigo_de_contrato'],
+                         on  = ['Fecha_corte', 'codigo_de_contrato'],
                          how = 'left')
 
 cosecha = cosecha[ cosecha['fecha_de_desembolso'] <= cosecha['Fecha_corte'] ]
 
-cosecha['m_desembolso'] = np.where(cosecha['Fecha_corte'] <= cosecha['fecha_de_desembolso'],
-                                   cosecha['monto_prestado'],
-                                   0)
-
 #%%
 if crear_excels == True:
-    cosecha.to_csv('cosecha_lending_v1.csv',
+    cosecha.to_csv(r'G:\.shortcut-targets-by-id\1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a\BUSINESS ANALYTICS\Lending\portafolio_lending\cosecha_lending.csv',
                    encoding = 'utf-8-sig',
                    index = False,
                    sep = ',')
 
-
+#%%
+print('fin')
