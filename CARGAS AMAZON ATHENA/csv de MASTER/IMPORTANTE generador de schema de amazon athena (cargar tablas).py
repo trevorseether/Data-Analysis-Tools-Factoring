@@ -7,6 +7,10 @@ Created on Thu Aug 14 15:43:33 2025
 
 import pandas as pd
 
+codmes = '2025-10-31'
+
+#%%
+
 df = pd.read_excel(r'G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a/BUSINESS ANALYTICS/FACTORING/COMISIONES/Ejecutivos Factoring/fac_ejecutivos.xlsx',
                    sheet_name = 'Ejecutivos',
                    dtype = str)
@@ -19,11 +23,12 @@ df.to_csv(r"G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a/BUSINES
 
 #%%%
 # el nombre del csv, también debe ser el nombre de la carpeta
-nombre_csv = 'fac_ejecutivos'
 
-df = pd.read_csv(r'G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a/BUSINESS ANALYTICS/FACTORING/PROYECTOS/scripts Joseph/Lending/portafolio_lending_v1',
+
+df = pd.read_csv(r'G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a/BUSINESS ANALYTICS/Lending/portafolio_lending/cosecha_lending.csv',
                  delimiter = ',')
 
+nombre_csv = 'cosecha_lending' ############################################################################################
 
 mapping_types = {
     'object'          : 'string',

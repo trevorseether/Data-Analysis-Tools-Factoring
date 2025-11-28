@@ -18,6 +18,9 @@ import io
 
 from pyathena import connect
 
+#%% mes a actualizar
+codmes = '2025-11-30' # formato YYYY-MM-DD
+
 #%% Credenciales de AmazonAthena
 with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
     creds = json.load(f)
@@ -31,11 +34,38 @@ conn = connect(
     
     )
 
+#%%
+query = '''
+select  * from prod_datalake_sandbox.ba__fac_ejecutivos
+
+ '''
+ 
+cursor = conn.cursor()
+cursor.execute(query)
+
+# Obtener los resultados
+resultados = cursor.fetchall()
+
+# Obtener los nombres de las columnas
+column_names = [desc[0] for desc in cursor.description]
+
+# Convertir los resultados a un DataFrame de pandas
+df_actual = pd.DataFrame(resultados, columns = column_names)
+
+df_actual['corte_mensual'] = pd.to_datetime( df_actual['corte_mensual'] )
+df_actual['codmes'] = df_actual['codmes'].astype(int)
+
+df_actual.columns = df_actual.columns.str.lower()
+
 #%% LECTURA DE FUENTE PRINCIPAL
 # sobre este excel se pueden hacer las modificaciones
 df = pd.read_excel(r'G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a/BUSINESS ANALYTICS/FACTORING/COMISIONES/Ejecutivos Factoring/fac_ejecutivos.xlsx',
                    sheet_name = 'Ejecutivos',
                    dtype = str)
+
+df = df.drop(df.filter(regex="Unnamed").columns, axis=1)
+
+df.columns = df.columns.str.lower()
 
 #%%
 from datetime import datetime, timedelta
@@ -46,6 +76,21 @@ now = datetime.now(ZoneInfo("America/Lima"))
 
 # Guardar directamente el objeto datetime
 df["_timestamp"] = now - timedelta(hours=5)
+
+#%% añadir columnas corte_mensual y codmes
+columnas = df.columns
+columnas = list(columnas)
+
+df['corte_mensual'] = pd.Timestamp(codmes)
+codmes_yyyymm = pd.to_datetime(codmes).strftime('%Y%m')
+df['codmes'] =int(codmes_yyyymm)
+
+df = df[['corte_mensual', 'codmes'] + columnas]
+
+#%% concatenar dataframes para cargar al lake
+df_actual = df_actual[df_actual['corte_mensual'] != pd.Timestamp(codmes) ]
+
+df = pd.concat([df_actual, df], ignore_index = True)
 
 #%%
 nombre_tabla = 'fac_ejecutivos'

@@ -10,7 +10,7 @@ Created on Wed Oct 15 09:59:08 2025
 # =============================================================================
 
 import pandas as pd
-import os
+# import os
 import numpy as np
 # pd.options.display.date_format = "%Y-%m-%d"
 
@@ -251,9 +251,9 @@ df_temp = df_fechas.assign(key=1).merge(df_ops.assign(key=1),
 # Filtrar solo cuando la fecha está entre desembolso y cancelación
 fecha_max = df_temp['Fecha_corte'].max()
 df_temp['fecha_de_finalizacion'] = pd.to_datetime(df_temp['fecha_de_finalizacion'])  # aseguramos tipo datetime
-df_temp['Fecha_corte'] = pd.to_datetime(df_temp['Fecha_corte'])
-df_temp['mes_finalizacion'] = df_temp['fecha_de_finalizacion'].dt.to_period('M').dt.to_timestamp('M')
-df_temp['mes_desembolso'] = df_temp['fecha_de_desembolso'].dt.to_period('M').dt.to_timestamp('M')
+df_temp['Fecha_corte']           = pd.to_datetime(df_temp['Fecha_corte'])
+df_temp['mes_finalizacion']      = df_temp['fecha_de_finalizacion'].dt.to_period('M').dt.to_timestamp('M')
+df_temp['mes_desembolso']        = df_temp['fecha_de_desembolso'].dt.to_period('M').dt.to_timestamp('M')
 
 def col_aux(df):
     if df['mes_finalizacion'] == df['Fecha_corte']:
@@ -267,6 +267,14 @@ def col_aux(df):
 
 df_temp['aux col filtrado'] = df_temp.apply(col_aux, axis = 1)
 
+#%% solarizando monto prestado, interés ganado
+df_temp['monto_prestado_soles'] = np.where(df_temp['moneda'] == 'DOLARES',
+                                           round(df_temp['monto_prestado'] * df_temp['exchange_rate'],2),
+                                           df_temp['monto_prestado'] )
+
+df_temp['interes_ganados_soles'] = np.where(df_temp['moneda'] == 'DOLARES',
+                                            round(df_temp['interes_ganados'] * df_temp['exchange_rate'],2),
+                                            df_temp['interes_ganados'] )
 
 #%% filtración, las ops solo aparecen desde que son desembolsadas hasta que son finalizadas
 df_temp = df_temp[df_temp['aux col filtrado'] != 'eliminar']
@@ -329,14 +337,24 @@ df_temp['Saldo a favor']            = df_temp['Saldo a favor'].fillna(0)
 del df_temp['Codigo de prestamo']
 
 #%% solarizando
+cols_solarizar = ['Capital pagado', 'Interes pagado', 'Interes moratorio pagado',
+'Saldo a favor', 'TOTAL DE LA CUOTA PAGADA', 'Saldo por cancelar']
 
-
+for i in cols_solarizar:
+    df_temp[i + '_soles'] = np.where(df_temp['moneda'] == 'DOLARES',
+                                     round(df_temp[i] * df_temp['exchange_rate'],2),
+                                     df_temp[i])
+df_temp.columns
 
 #%% cálculo de saldo capital
 df_temp['Saldo Capital'] = np.where(df_temp['aux col filtrado'] == 'finalizado',
                                     0,
                                     np.maximum(df_temp['Saldo por cancelar'] - df_temp['Capital pagado'], 0))
 del df_temp['Saldo por cancelar']
+
+df_temp['Saldo Capital_soles'] = np.where(df_temp['moneda'] == 'DOLARES',
+                                          round(df_temp['Saldo Capital'] * df_temp['exchange_rate'],2),
+                                          df_temp['Saldo Capital'] )
 
 #%% cálculo dedías de atraso
 # obtenemos la mínima fecha vigente de próximo pago
@@ -413,10 +431,22 @@ df_temp['par 150'] = np.where(df_temp['dias atraso'] > 150, df_temp['Saldo Capit
 df_temp['par 180'] = np.where(df_temp['dias atraso'] > 180, df_temp['Saldo Capital'], 0)
 df_temp['par 360'] = np.where(df_temp['dias atraso'] > 360, df_temp['Saldo Capital'], 0)
 
+df_temp['par 0_soles']   = np.where(df_temp['dias atraso'] > 0,   df_temp['Saldo Capital_soles'], 0)
+df_temp['par 15_soles']  = np.where(df_temp['dias atraso'] > 15,  df_temp['Saldo Capital_soles'], 0)
+df_temp['par 30_soles']  = np.where(df_temp['dias atraso'] > 30,  df_temp['Saldo Capital_soles'], 0)
+df_temp['par 60_soles']  = np.where(df_temp['dias atraso'] > 60,  df_temp['Saldo Capital_soles'], 0)
+df_temp['par 90_soles']  = np.where(df_temp['dias atraso'] > 90,  df_temp['Saldo Capital_soles'], 0)
+df_temp['par 120_soles'] = np.where(df_temp['dias atraso'] > 120, df_temp['Saldo Capital_soles'], 0)
+df_temp['par 150_soles'] = np.where(df_temp['dias atraso'] > 150, df_temp['Saldo Capital_soles'], 0)
+df_temp['par 180_soles'] = np.where(df_temp['dias atraso'] > 180, df_temp['Saldo Capital_soles'], 0)
+df_temp['par 360_soles'] = np.where(df_temp['dias atraso'] > 360, df_temp['Saldo Capital_soles'], 0)
+
 #%% q_desembolso
 df_temp['q_desembolso'] = np.where(df_temp['mes_desembolso'] == df_temp['Fecha_corte'], 1, 0)
 
 df_temp['m_desembolso'] = np.where(df_temp['mes_desembolso'] == df_temp['Fecha_corte'], df_temp['monto_prestado'], 0)
+
+df_temp['m_desembolso_soles'] = np.where(df_temp['mes_desembolso'] == df_temp['Fecha_corte'], df_temp['monto_prestado_soles'], 0)
 
 #%% cálculo de provisiones
 # primero que nada columna de Clasificación
@@ -452,14 +482,64 @@ df_temp['% Provision'] = df_temp.apply(porcentaje_provision, axis = 1)
 
 df_temp['Provision'] = df_temp['% Provision'] * df_temp['Saldo Capital']
 df_temp['Provision'] = round( df_temp['Provision'], 2)
+
+df_temp['Provision_soles'] = df_temp['% Provision'] * df_temp['Saldo Capital_soles']
+df_temp['Provision_soles'] = round( df_temp['Provision_soles'], 2)
+
+
 ########## flag castigo #######################################################
 
 df_temp['flag_castigo_>150'] = np.where(df_temp['dias atraso'] > 150,
                                        'castigo',
                                        '')
 
-#%% ordenamiento NO NECESARIO
+df_temp['Saldo_castigado'] = np.where(df_temp['dias atraso'] > 150,
+                                       df_temp['Saldo Capital'],
+                                       '')
+df_temp['Saldo_castigado_soles'] = np.where(df_temp['dias atraso'] > 150,
+                                       df_temp['Saldo Capital_soles'],
+                                       '')
 
+#%% ordenamient
+cols_para_ordenamiento = ['Fecha_corte', 'codmes', 'exchange_rate', 'codigo_de_contrato',
+       'codigo_de_prestamo', 'tipo_de_persona', 'tipo_de_cliente',
+       'tipo_de_documento', 'numero_de_documento', 'persona_o_rrll', 'ruc',
+       'empresa', 'correo', 'riesgo', 'tipo_de_prestamo', 'moneda',
+       'nro_de_cuotas', 'monto_prestado', 'monto_prestado_soles',  'tem', 'tea', 
+       'interes_ganados', 'interes_ganados_soles', 
+       'saldo_a_pagar', 'fecha_de_desembolso', 'banco_de_desembolso',
+       'numero_de_cuenta_del_cliente', 'gestion_del_prestamo',
+       'status_actual_del_prestamo', 'fecha_de_finalizacion',
+       '¿se_envio_correo_de_desmbolso?', '¿se_ingreso_al_core_bancario?',
+       '¿se_envio_correo_inicial_a_contabilidad?', 'dias_de_mora',
+       '¿se_ingreso_a_equifax?', 'carpeta_cliente', 'direccion',
+       'numero_de_contacto', 'Fecha de pago del cliente',
+       'propietario_negocio', 'mes_finalizacion', 'mes_desembolso',
+       'aux col filtrado', 
+       
+       'Capital pagado',
+       'Interes pagado', 'Interes moratorio pagado', 'Saldo a favor',
+       'TOTAL DE LA CUOTA PAGADA', 'Saldo Capital', 
+       
+       'Capital pagado_soles', 'Interes pagado_soles',
+       'Interes moratorio pagado_soles', 'Saldo a favor_soles',
+       'TOTAL DE LA CUOTA PAGADA_soles', 'Saldo Capital_soles',
+       
+       
+       'fecha proximo pago',
+       'dias atraso', 'rango_dias_atraso', 
+       
+       'par 0', 'par 15', 'par 30',
+       'par 60', 'par 90', 'par 120', 'par 150', 'par 180', 'par 360',
+       
+       'par 0_soles', 'par 15_soles', 'par 30_soles',
+       'par 60_soles', 'par 90_soles', 'par 120_soles', 'par 150_soles', 'par 180_soles', 'par 360_soles',
+       
+       'q_desembolso', 'm_desembolso', 'm_desembolso_soles', 
+       'Clasificacion', '% Provision',
+       'Provision', 'Provision_soles', 'flag_castigo_>150', 'Saldo_castigado', 'Saldo_castigado_soles']
+
+df_temp = df_temp[cols_para_ordenamiento]
 
 #%% CARGA AL LAKE
 # Cliente de S3
@@ -544,8 +624,8 @@ cosecha = cosecha.drop_duplicates(subset = 'codigo_de_contrato')
 
 # cosecha, cruce cartesiano ###################################################
 cosecha = cosecha[['codigo_de_contrato', 'fecha_de_desembolso', 'mes_desembolso',
-                   'moneda', 'monto_prestado', 'tipo_de_persona', 'tipo_de_documento',
-                   'numero_de_documento', 'persona_o_rrll', 'ruc', 'empresa', 'correo']]
+                   'moneda', 'monto_prestado', 'monto_prestado_soles', 'tipo_de_persona', 
+                   'tipo_de_documento', 'numero_de_documento', 'persona_o_rrll', 'ruc', 'empresa', 'correo']]
 
 cosecha = df_fechas.assign(key = 1).merge(cosecha.assign(key = 1),
                                           on  = 'key',
@@ -556,10 +636,17 @@ cosecha = cosecha[cosecha['mes_desembolso'] <= cosecha['Fecha_corte']]
 ###### añadiendo datos de cada corte mensual ##################################
 filtracion = df_temp[df_temp['aux col filtrado'] != 'finalizado']
 
-filtracion = filtracion[['Fecha_corte', 'codigo_de_contrato', 'Saldo Capital', 
-                         'fecha proximo pago', 'dias atraso', 'par 0', 'par 15',
+filtracion = filtracion[['Fecha_corte', 'codigo_de_contrato', 'Saldo Capital', 'Saldo Capital_soles',
+                         'fecha proximo pago', 'dias atraso', 
+                         
+                         'par 0', 'par 15',
                          'par 30', 'par 60', 'par 90', 'par 120', 'par 150', 
-                         'par 180', 'par 360']]
+                         'par 180', 'par 360',
+                         
+                         'par 0_soles', 'par 15_soles', 'par 30_soles',
+                         'par 60_soles', 'par 90_soles', 'par 120_soles', 'par 150_soles', 'par 180_soles', 'par 360_soles',
+
+                         ]]
 
 filtracion['indice_compuesto'] = filtracion['Fecha_corte'].astype(str) + filtracion['codigo_de_contrato']
 filtracion = filtracion.drop_duplicates(subset = 'indice_compuesto')
@@ -572,8 +659,29 @@ cosecha = cosecha.merge(filtracion,
 cosecha = cosecha[ cosecha['fecha_de_desembolso'] <= cosecha['Fecha_corte'] ]
 
 #%%
+# ==== CONFIGURACIÓN ==== 
+bucket_name = "prod-datalake-raw-730335218320" 
+s3_prefix = "manual/ba/cosecha_lending/" # carpeta lógica en el bucket 
+
+# ==== EXPORTAR A PARQUET EN MEMORIA ====
+csv_buffer = io.StringIO()
+
+cosecha.to_csv(csv_buffer, index=False, encoding="utf-8-sig") 
+
+# Nombre de archivo con timestamp (opcional, para histórico) 
+s3_key = f"{s3_prefix}cosecha_lending.csv" 
+
+# Subir directamente desde el buffer 
+s3.put_object(Bucket  = bucket_name, 
+              Key     = s3_key, 
+              Body    = csv_buffer.getvalue() 
+              )
+
+print(f"✅ Archivo subido a s3://{bucket_name}/{s3_key}")
+
+
 if crear_excels == True:
-    cosecha.to_csv(r'G:\.shortcut-targets-by-id\1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a\BUSINESS ANALYTICS\Lending\portafolio_lending\cosecha_lending.csv',
+    cosecha.to_csv(r'G:\.shortcut-targets-by-id\1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a\BUSINESS ANALYTICS\Lending\cosecha_lending\cosecha_lending.csv',
                    encoding = 'utf-8-sig',
                    index = False,
                    sep = ',')
