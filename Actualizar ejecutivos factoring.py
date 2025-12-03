@@ -38,7 +38,7 @@ conn = connect(
 query = '''
 select  * from prod_datalake_sandbox.ba__fac_ejecutivos
 
- '''
+'''
  
 cursor = conn.cursor()
 cursor.execute(query)

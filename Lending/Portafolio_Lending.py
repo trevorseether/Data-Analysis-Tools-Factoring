@@ -658,6 +658,7 @@ cosecha = cosecha.merge(filtracion,
 
 cosecha = cosecha[ cosecha['fecha_de_desembolso'] <= cosecha['Fecha_corte'] ]
 
+print('añadir que las operaciones ampliaciones no se agrupen por código de contrato')
 #%%
 # ==== CONFIGURACIÓN ==== 
 bucket_name = "prod-datalake-raw-730335218320" 

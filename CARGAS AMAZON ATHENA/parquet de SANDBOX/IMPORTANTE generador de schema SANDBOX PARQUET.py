@@ -123,6 +123,9 @@ nombre_carpeta = nombre_parquet
 df = pd.read_parquet(r'C:/Users/Joseph Montoya/Desktop/fac_monthly_portfolio/fac_monthly_portfolio.csv')
 
 #%%
+nombre_parquet = 'fac_comercial_moro_recup'
+nombre_carpeta = nombre_parquet
+
 mapping_types = {
     'object'          : 'string',
     'float64'         : 'double',
