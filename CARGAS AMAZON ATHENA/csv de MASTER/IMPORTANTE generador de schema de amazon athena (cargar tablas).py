@@ -25,7 +25,7 @@ df.to_csv(r"G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a/BUSINES
 # el nombre del csv, también debe ser el nombre de la carpeta
 
 
-df = pd.read_csv(r'G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a/BUSINESS ANALYTICS/Lending/portafolio_lending/cosecha_lending.csv',
+df = pd.read_csv(r'G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a/BUSINESS ANALYTICS/Lending/portafolio_lending/portafolio_lending.csv',
                  delimiter = ',')
 
 nombre_csv = 'cosecha_lending' ############################################################################################

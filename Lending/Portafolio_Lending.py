@@ -24,7 +24,6 @@ from pyathena import connect
 
 #%%
 fecha_corte = '2025-12-31' # YYYY-MM-DD
-
 crear_excels = True # True o False
 
 #%% Credenciales de AmazonAthena
@@ -109,8 +108,8 @@ def parse_dates(date_str):
                 '%d/%m/%Y %H:%M:%S'    ,
                 '%d/%m/%Y'             ,
                 '%Y-%m-%d %H:%M:%S'    ,
-                '%Y%m%d', '%Y-%m-%d'   , 
-                '%Y-%m-%d %H:%M:%S'    , 
+                '%Y%m%d', '%Y-%m-%d'   ,
+                '%Y-%m-%d %H:%M:%S'    ,
                 '%Y/%m/%d %H:%M:%S'    ,
                 '%Y-%m-%d %H:%M:%S PM' ,
                 '%Y-%m-%d %H:%M:%S AM' ,
@@ -130,6 +129,25 @@ df_ops['fecha_de_finalizacion'] = df_ops['fecha_de_finalizacion'].apply(parse_da
 bd_pagos['Fecha de pago del cliente'] = bd_pagos['Fecha de pago del cliente'].apply(parse_dates)
 bd_pagos['Fecha de pago del cliente'] = pd.to_datetime(bd_pagos['Fecha de pago del cliente'])
 
+#%% obteniendo datos históricos 
+query = '''  SELECT * FROM PROD_DATALAKE_MASTER.BA__PORTAFOLIO_LENDING_MONTHLY_SNAPSHOT  '''
+cursor = conn.cursor()
+cursor.execute(query)
+
+# Obtener los resultados
+resultados = cursor.fetchall()
+
+# Obtener los nombres de las columnas
+column_names = [desc[0] for desc in cursor.description]
+
+# Convertir los resultados a un DataFrame de pandas
+df_monthly_snapshot = pd.DataFrame(resultados, columns = column_names)
+
+# eliminar el mes actual (si es que existe, porque luego se va a incluir)
+df_monthly_snapshot = df_monthly_snapshot[ df_monthly_snapshot['fecha_corte'] != pd.Timestamp( fecha_corte ) ]
+df_monthly_snapshot['codmes'] = df_monthly_snapshot['codmes'].astype(int)
+
+del df_monthly_snapshot['_timestamp']
 #%% Fecha finalización de la operación
 # cálculo para validaciones sacando la máxima fecha del BD_PAGOS
 bd_pagos['flag_finalizado'] = (
@@ -500,6 +518,24 @@ df_temp['Saldo_castigado_soles'] = np.where(df_temp['dias atraso'] > 150,
                                        df_temp['Saldo Capital_soles'],
                                        '')
 
+#%% nos quedamos con los castigos históricos, para asegurarnos de nos descastigar nada
+df_castigados = df_monthly_snapshot[ df_monthly_snapshot['flag_castigo_>150'] == 'castigo' ]
+df_castigados = df_castigados[['fecha_corte', 'codigo_de_contrato', 'flag_castigo_>150']]
+
+df_castigados = df_castigados.sort_values( by = 'fecha_corte', ascending = True )
+df_castigados = df_castigados.drop_duplicates( subset = 'codigo_de_contrato', keep = 'first')
+df_castigados = df_castigados.rename( columns={'fecha_corte': 'mes_castigo',
+                                               'flag_castigo_>150': 'castigo'})
+
+df_temp = df_temp.merge(df_castigados,
+                        on  = 'codigo_de_contrato',
+                        how = 'left')
+df_temp['castigado_pero_recuperado'] = np.where((df_temp['castigo'] == 'castigo') & 
+                                                (df_temp['flag_castigo_>150'] == '') & (df_temp['Fecha_corte'] >= df_temp['mes_castigo']),
+                                                'castigado pero recuperado',
+                                                '')
+del df_temp['castigo']
+
 #%% ordenamient
 cols_para_ordenamiento = ['Fecha_corte', 'codmes', 'exchange_rate', 'codigo_de_contrato',
        'codigo_de_prestamo', 'tipo_de_persona', 'tipo_de_cliente',
@@ -537,7 +573,7 @@ cols_para_ordenamiento = ['Fecha_corte', 'codmes', 'exchange_rate', 'codigo_de_c
        
        'q_desembolso', 'm_desembolso', 'm_desembolso_soles', 
        'Clasificacion', '% Provision',
-       'Provision', 'Provision_soles', 'flag_castigo_>150', 'Saldo_castigado', 'Saldo_castigado_soles']
+       'Provision', 'Provision_soles', 'flag_castigo_>150', 'castigado_pero_recuperado', 'mes_castigo', 'Saldo_castigado', 'Saldo_castigado_soles']
 
 df_temp = df_temp[cols_para_ordenamiento]
 
@@ -570,7 +606,7 @@ s3.put_object(Bucket  = bucket_name,
               Body    = csv_buffer.getvalue() 
               )
 
-print(f"✅ Archivo subido a s3://{bucket_name}/{s3_key}")
+print(f"✅ portafolio dinámico subido a s3://{bucket_name}/{s3_key}")
 
 
 if crear_excels == True:
@@ -579,6 +615,35 @@ if crear_excels == True:
                    sep      = ',',
                    encoding = 'utf-8-sig')
 
+#%% Carga al datalake del portafolio monthly snapshot
+df_mes_actual = df_temp[df_temp['Fecha_corte'] == pd.Timestamp(fecha_corte)]
+
+df_mes_actual.columns       = df_mes_actual.columns.str.lower()
+df_monthly_snapshot.columns = df_monthly_snapshot.columns.str.lower()
+
+df_monthly_snapshot = pd.concat([ df_monthly_snapshot,df_mes_actual ], ignore_index = True)
+
+# ==== CONFIGURACIÓN ==== 
+bucket_name = "prod-datalake-raw-730335218320" 
+s3_prefix = "manual/ba/portafolio_lending_monthly_snapshot/" # carpeta lógica en el bucket 
+
+# ==== EXPORTAR A PARQUET EN MEMORIA ====
+csv_buffer = io.StringIO()
+
+# del df_temp['exchange_rate']
+df_monthly_snapshot.to_csv(csv_buffer, index=False, encoding="utf-8-sig") 
+
+# Nombre de archivo con timestamp (opcional, para histórico) 
+s3_key = f"{s3_prefix}portafolio_lending_monthly_snapshot.csv" 
+
+# Subir directamente desde el buffer 
+s3.put_object(Bucket  = bucket_name, 
+              Key     = s3_key, 
+              Body    = csv_buffer.getvalue() 
+              )
+
+print(f"✅ portafolio monthly snapshot subido a s3://{bucket_name}/{s3_key}")
+
 #%%
 # =============================================================================
 # =============================================================================
@@ -586,7 +651,7 @@ if crear_excels == True:
 # =============================================================================
 # =============================================================================
 
-cosecha = df_temp[df_temp['q_desembolso'] == 1]
+cosecha = df_monthly_snapshot[df_monthly_snapshot['q_desembolso'] == 1]
 cosecha = cosecha.sort_values(by='fecha_de_desembolso', ascending = True)
 
 ################   colocar mínima fecha de desembolso  ########################
@@ -634,7 +699,7 @@ cosecha = df_fechas.assign(key = 1).merge(cosecha.assign(key = 1),
 cosecha = cosecha[cosecha['mes_desembolso'] <= cosecha['Fecha_corte']]
 
 ###### añadiendo datos de cada corte mensual ##################################
-filtracion = df_temp[df_temp['aux col filtrado'] != 'finalizado']
+filtracion = df_monthly_snapshot[ df_monthly_snapshot['aux col filtrado'] != 'finalizado' ]
 
 filtracion = filtracion[['Fecha_corte', 'codigo_de_contrato', 'Saldo Capital', 'Saldo Capital_soles',
                          'fecha proximo pago', 'dias atraso', 
