@@ -21,7 +21,10 @@ def sum_date(codmes,months):
     temp = datetime.strptime(codmes, '%Y%m') + relativedelta(months=months)
     return datetime.strftime(temp,'%Y%m')
 
-cierre = '202510'
+###############################################################################
+cierre = '202511'                                                          ####
+###############################################################################
+
 fecha_cierre = pd.to_datetime(cierre, format='%Y%m') + pd.offsets.MonthEnd(0)
 
 # pd.set_option('display.max_columns', None)

@@ -144,7 +144,8 @@ column_names = [desc[0] for desc in cursor.description]
 df_monthly_snapshot = pd.DataFrame(resultados, columns = column_names)
 
 # eliminar el mes actual (si es que existe, porque luego se va a incluir)
-df_monthly_snapshot = df_monthly_snapshot[ df_monthly_snapshot['fecha_corte'] != pd.Timestamp( fecha_corte ) ]
+df_monthly_snapshot['fecha_corte'] = pd.to_datetime(df_monthly_snapshot['fecha_corte'])
+df_monthly_snapshot = df_monthly_snapshot[ df_monthly_snapshot['fecha_corte'] < pd.Timestamp( fecha_corte ) ]
 df_monthly_snapshot['codmes'] = df_monthly_snapshot['codmes'].astype(int)
 
 del df_monthly_snapshot['_timestamp']
@@ -275,15 +276,15 @@ df_temp['mes_desembolso']        = df_temp['fecha_de_desembolso'].dt.to_period('
 
 def col_aux(df):
     if df['mes_finalizacion'] == df['Fecha_corte']:
-        return 'finalizado'
+        return 'FINALIZADO'
     if df['fecha_de_desembolso'] > df['Fecha_corte']:
         return 'eliminar'
     if df['mes_finalizacion'] < df['Fecha_corte']:
         return 'eliminar'
     if df['fecha_de_desembolso'] <= df['Fecha_corte']:
-        return 'vigente'
+        return 'VIGENTE'
 
-df_temp['aux col filtrado'] = df_temp.apply(col_aux, axis = 1)
+df_temp['condicion_actual_del_credito'] = df_temp.apply(col_aux, axis = 1)
 
 #%% solarizando monto prestado, interés ganado
 df_temp['monto_prestado_soles'] = np.where(df_temp['moneda'] == 'DOLARES',
@@ -295,7 +296,7 @@ df_temp['interes_ganados_soles'] = np.where(df_temp['moneda'] == 'DOLARES',
                                             df_temp['interes_ganados'] )
 
 #%% filtración, las ops solo aparecen desde que son desembolsadas hasta que son finalizadas
-df_temp = df_temp[df_temp['aux col filtrado'] != 'eliminar']
+df_temp = df_temp[df_temp['condicion_actual_del_credito'] != 'eliminar']
 
 #%% Agregando columnas agregadas desde el bd_pagos
 cap_original = bd_pagos.pivot_table(index = 'Codigo de prestamo',
@@ -356,7 +357,7 @@ del df_temp['Codigo de prestamo']
 
 #%% solarizando
 cols_solarizar = ['Capital pagado', 'Interes pagado', 'Interes moratorio pagado',
-'Saldo a favor', 'TOTAL DE LA CUOTA PAGADA', 'Saldo por cancelar']
+'Saldo a favor', 'TOTAL DE LA CUOTA PAGADA',]# 'Saldo por cancelar']
 
 for i in cols_solarizar:
     df_temp[i + '_soles'] = np.where(df_temp['moneda'] == 'DOLARES',
@@ -365,7 +366,7 @@ for i in cols_solarizar:
 df_temp.columns
 
 #%% cálculo de saldo capital
-df_temp['Saldo Capital'] = np.where(df_temp['aux col filtrado'] == 'finalizado',
+df_temp['Saldo Capital'] = np.where(df_temp['condicion_actual_del_credito'] == 'FINALIZADO',
                                     0,
                                     np.maximum(df_temp['Saldo por cancelar'] - df_temp['Capital pagado'], 0))
 del df_temp['Saldo por cancelar']
@@ -399,7 +400,7 @@ df_temp = df_temp.merge(prox_fecha_pago,
                         right_on = ['Fecha_corte', 'Codigo de prestamo'],
                         how      = 'left')
 df_temp['fecha proximo pago'] = df_temp['fecha proximo pago'].where(
-    df_temp['aux col filtrado'] != 'finalizado',
+    df_temp['condicion_actual_del_credito'] != 'FINALIZADO',
     pd.NaT
 )
 
@@ -411,6 +412,14 @@ df_temp['dias atraso'] = (df_temp['Fecha_corte'] - df_temp['fecha proximo pago']
 df_temp['dias atraso'] = df_temp['dias atraso'].fillna(0)
 
 df_temp['dias atraso'] = np.maximum(df_temp['dias atraso'],0)
+
+#%% inserción para comprobación
+
+# df_temp.loc[(df_temp['codigo_de_prestamo'] == 'LH-45224519959') & (df_temp['codmes'] == '202512'), 'dias atraso'] = 151.0
+
+# df_temp.loc[(df_temp['codigo_de_prestamo'] == 'LH-45224519959') & (df_temp['codmes'] == '202601'), 'dias atraso'] = 40.0
+# df_temp.loc[(df_temp['codigo_de_prestamo'] == 'LH-45224519959') & (df_temp['codmes'] == '202601'), 'Saldo Capital'] = 1000.0
+# df_temp.loc[(df_temp['codigo_de_prestamo'] == 'LH-45224519959') & (df_temp['codmes'] == '202601'), 'Saldo Capital_soles'] = 1000.0
 
 #%% Rango días de atraso
 def rango_dias(df_temp):
@@ -507,37 +516,93 @@ df_temp['Provision_soles'] = round( df_temp['Provision_soles'], 2)
 
 ########## flag castigo #######################################################
 
-df_temp['flag_castigo_>150'] = np.where(df_temp['dias atraso'] > 150,
+df_temp['dias_atraso_>150'] = np.where(df_temp['dias atraso'] > 150,
                                        'castigo',
                                        '')
-
-df_temp['Saldo_castigado'] = np.where(df_temp['dias atraso'] > 150,
-                                       df_temp['Saldo Capital'],
-                                       '')
-df_temp['Saldo_castigado_soles'] = np.where(df_temp['dias atraso'] > 150,
-                                       df_temp['Saldo Capital_soles'],
-                                       '')
+# df_temp['Saldo_castigado'] = np.where(df_temp['dias atraso'] > 150,
+#                                        df_temp['Saldo Capital'],
+#                                        '')
+# df_temp['Saldo_castigado_soles'] = np.where(df_temp['dias atraso'] > 150,
+#                                        df_temp['Saldo Capital_soles'],
+#                                        '')
 
 #%% nos quedamos con los castigos históricos, para asegurarnos de nos descastigar nada
-df_castigados = df_monthly_snapshot[ df_monthly_snapshot['flag_castigo_>150'] == 'castigo' ]
-df_castigados = df_castigados[['fecha_corte', 'codigo_de_contrato', 'flag_castigo_>150']]
+
+df_monthly_snapshot.columns = df_monthly_snapshot.columns.str.lower()
+df_temp.columns             = df_temp.columns.str.lower()
+df_temp_mes_actual          = df_temp[df_temp['fecha_corte'] == pd.Timestamp(fecha_corte) ]
+df_monthly_snapshot         = df_monthly_snapshot[df_monthly_snapshot['fecha_corte'] < pd.Timestamp(fecha_corte)]
+df_monthly_snapshot = pd.concat([df_monthly_snapshot, df_temp_mes_actual], ignore_index = True)
+
+df_castigados = df_monthly_snapshot[ df_monthly_snapshot['dias_atraso_>150'] == 'castigo' ]
+df_castigados = df_castigados[['fecha_corte', 'codigo_de_prestamo', 'dias_atraso_>150']]
 
 df_castigados = df_castigados.sort_values( by = 'fecha_corte', ascending = True )
-df_castigados = df_castigados.drop_duplicates( subset = 'codigo_de_contrato', keep = 'first')
-df_castigados = df_castigados.rename( columns={'fecha_corte': 'mes_castigo',
-                                               'flag_castigo_>150': 'castigo'})
-
+df_castigados = df_castigados.drop_duplicates( subset = 'codigo_de_prestamo', keep = 'first')
+df_castigados = df_castigados.rename( columns={'fecha_corte'     : 'mes_castigo',
+                                               'dias_atraso_>150': 'status castigo'})
 df_temp = df_temp.merge(df_castigados,
-                        on  = 'codigo_de_contrato',
+                        on  = 'codigo_de_prestamo',
                         how = 'left')
-df_temp['castigado_pero_recuperado'] = np.where((df_temp['castigo'] == 'castigo') & 
-                                                (df_temp['flag_castigo_>150'] == '') & (df_temp['Fecha_corte'] >= df_temp['mes_castigo']),
+
+# bloque que ayuda a que el crédito se mantenga castigado aunque pase el tiempo
+df_temp['condicion_actual_del_credito'] = np.where( (df_temp['status castigo'] == 'castigo') & (df_temp['fecha_corte'] >= df_temp['mes_castigo']),
+                                                    'CASTIGADO',
+                                                    df_temp['condicion_actual_del_credito'])
+
+df_temp['mes_castigo'] = df_temp['mes_castigo'].where(df_temp['mes_castigo'] <= df_temp['fecha_corte'],
+                                                      pd.NaT )
+
+df_temp['castigado_pero_recuperado'] = np.where((df_temp['status castigo'] == 'castigo') & 
+                                                (df_temp['dias_atraso_>150'] == '') & (df_temp['fecha_corte'] >= df_temp['mes_castigo']),
                                                 'castigado pero recuperado',
                                                 '')
-del df_temp['castigo']
+
+# indica que está castigado solo en el mes de castigo
+df_temp['flag_castigado'] = np.where(df_temp['mes_castigo'] == df_temp['fecha_corte'],
+                                     1,
+                                     0)
+# cálculo de la provisión solo se debe hacer en el mes de castigo
+df_temp['provision'] = np.where( (df_temp['status castigo'] == 'castigo') & ( df_temp['fecha_corte'] > df_temp['mes_castigo']) ,
+                                 0,
+                                 df_temp['provision'] )
+df_temp['provision_soles'] = np.where( (df_temp['status castigo'] == 'castigo') & ( df_temp['fecha_corte'] > df_temp['mes_castigo']) ,
+                                 0,
+                                 df_temp['provision_soles'] )
+
+# obteniendo el saldo castigado, servirá para calcular el monto recuperado
+saldo_castigado = df_monthly_snapshot[ df_monthly_snapshot['dias_atraso_>150'] == 'castigo' ]
+saldo_castigado = saldo_castigado[['fecha_corte', 'codigo_de_prestamo','saldo capital', 'saldo capital_soles']]
+saldo_castigado = saldo_castigado.sort_values(by = 'fecha_corte', ascending = True)
+saldo_castigado = saldo_castigado.drop_duplicates(subset = 'codigo_de_prestamo')
+saldo_castigado = saldo_castigado.rename(columns = {'saldo capital'      : 'saldo castigado',
+                                                    'saldo capital_soles': 'saldo castigado_soles',
+                                                    'fecha_corte' : 'fecha mes de castigo'})
+
+df_temp = df_temp.merge(saldo_castigado,
+                        on = 'codigo_de_prestamo',
+                        how = 'left')
+df_temp['saldo castigado'] = np.where(df_temp['mes_castigo'] <= df_temp['fecha_corte'],
+                                      df_temp['saldo castigado'],
+                                      0)
+df_temp['saldo castigado'] = df_temp['saldo castigado'].fillna(0)
+df_temp['saldo castigado_soles'] = np.where(df_temp['mes_castigo'] <= df_temp['fecha_corte'],
+                                            df_temp['saldo castigado_soles'],
+                                            0)
+df_temp['saldo castigado_soles'] = df_temp['saldo castigado_soles'].fillna(0)
+
+# monto recuperado
+df_temp['monto recuperado'] = np.maximum(df_temp['saldo castigado'].fillna(0) - df_temp['saldo capital'].fillna(0),0)
+df_temp['monto recuperado'] = np.maximum(df_temp['monto recuperado'].fillna(0),0)
+
+df_temp['monto recuperado_soles'] = np.maximum(df_temp['saldo castigado_soles'].fillna(0) - df_temp['saldo capital_soles'].fillna(0),0)
+df_temp['monto recuperado_soles'] = np.maximum(df_temp['monto recuperado_soles'].fillna(0),0)
+
+del df_temp['saldo castigado']
+del df_temp['saldo castigado_soles']
 
 #%% ordenamient
-cols_para_ordenamiento = ['Fecha_corte', 'codmes', 'exchange_rate', 'codigo_de_contrato',
+cols_para_ordenamiento = ['fecha_corte', 'codmes', 'exchange_rate', 'codigo_de_contrato',
        'codigo_de_prestamo', 'tipo_de_persona', 'tipo_de_cliente',
        'tipo_de_documento', 'numero_de_documento', 'persona_o_rrll', 'ruc',
        'empresa', 'correo', 'riesgo', 'tipo_de_prestamo', 'moneda',
@@ -549,17 +614,17 @@ cols_para_ordenamiento = ['Fecha_corte', 'codmes', 'exchange_rate', 'codigo_de_c
        '¿se_envio_correo_de_desmbolso?', '¿se_ingreso_al_core_bancario?',
        '¿se_envio_correo_inicial_a_contabilidad?', 'dias_de_mora',
        '¿se_ingreso_a_equifax?', 'carpeta_cliente', 'direccion',
-       'numero_de_contacto', 'Fecha de pago del cliente',
+       'numero_de_contacto', 'fecha de pago del cliente',
        'propietario_negocio', 'mes_finalizacion', 'mes_desembolso',
-       'aux col filtrado', 
+       'condicion_actual_del_credito', 
        
-       'Capital pagado',
-       'Interes pagado', 'Interes moratorio pagado', 'Saldo a favor',
-       'TOTAL DE LA CUOTA PAGADA', 'Saldo Capital', 
+       'capital pagado',
+       'interes pagado', 'interes moratorio pagado', 'saldo a favor',
+       'total de la cuota pagada', 'saldo capital', 
        
-       'Capital pagado_soles', 'Interes pagado_soles',
-       'Interes moratorio pagado_soles', 'Saldo a favor_soles',
-       'TOTAL DE LA CUOTA PAGADA_soles', 'Saldo Capital_soles',
+       'capital pagado_soles', 'interes pagado_soles',
+       'interes moratorio pagado_soles', 'saldo a favor_soles',
+       'total de la cuota pagada_soles', 'saldo capital_soles',
        
        
        'fecha proximo pago',
@@ -572,8 +637,8 @@ cols_para_ordenamiento = ['Fecha_corte', 'codmes', 'exchange_rate', 'codigo_de_c
        'par 60_soles', 'par 90_soles', 'par 120_soles', 'par 150_soles', 'par 180_soles', 'par 360_soles',
        
        'q_desembolso', 'm_desembolso', 'm_desembolso_soles', 
-       'Clasificacion', '% Provision',
-       'Provision', 'Provision_soles', 'flag_castigo_>150', 'castigado_pero_recuperado', 'mes_castigo', 'Saldo_castigado', 'Saldo_castigado_soles']
+       'clasificacion', '% provision',
+       'provision', 'provision_soles', 'dias_atraso_>150', 'flag_castigado', 'castigado_pero_recuperado', 'mes_castigo', 'monto recuperado', 'monto recuperado_soles']
 
 df_temp = df_temp[cols_para_ordenamiento]
 
@@ -616,11 +681,12 @@ if crear_excels == True:
                    encoding = 'utf-8-sig')
 
 #%% Carga al datalake del portafolio monthly snapshot
-df_mes_actual = df_temp[df_temp['Fecha_corte'] == pd.Timestamp(fecha_corte)]
+df_mes_actual = df_temp[df_temp['fecha_corte'] == pd.Timestamp(fecha_corte)]
 
 df_mes_actual.columns       = df_mes_actual.columns.str.lower()
 df_monthly_snapshot.columns = df_monthly_snapshot.columns.str.lower()
 
+df_monthly_snapshot = df_monthly_snapshot[df_monthly_snapshot['fecha_corte'] < pd.Timestamp(fecha_corte)]
 df_monthly_snapshot = pd.concat([ df_monthly_snapshot,df_mes_actual ], ignore_index = True)
 
 # ==== CONFIGURACIÓN ==== 
@@ -650,6 +716,11 @@ print(f"✅ portafolio monthly snapshot subido a s3://{bucket_name}/{s3_key}")
 # #                                 COSECHA
 # =============================================================================
 # =============================================================================
+# indicador de que op es ampliación, para que no se agrupen en la cosecha
+df_monthly_snapshot['codigo_de_contrato'] = np.where(df_monthly_snapshot['gestion_del_prestamo'] == 'Ampliación',
+                                                     df_monthly_snapshot['codigo_de_contrato'] + '-AMP',
+                                                     df_monthly_snapshot['codigo_de_contrato'])
+
 
 cosecha = df_monthly_snapshot[df_monthly_snapshot['q_desembolso'] == 1]
 cosecha = cosecha.sort_values(by='fecha_de_desembolso', ascending = True)
@@ -684,7 +755,7 @@ cosecha['monto_prestado'] = np.where(cosecha['max_monto_desembolsado'].notna(),
 del cosecha['max_monto_desembolsado']
 
 ####### nos quedamos solo con las operaciones validadas para cosecha ##########
-cosecha = cosecha.sort_values(by = 'Fecha_corte', ascending = False)
+cosecha = cosecha.sort_values(by = 'fecha_corte', ascending = False)
 cosecha = cosecha.drop_duplicates(subset = 'codigo_de_contrato')
 
 # cosecha, cruce cartesiano ###################################################
@@ -699,9 +770,9 @@ cosecha = df_fechas.assign(key = 1).merge(cosecha.assign(key = 1),
 cosecha = cosecha[cosecha['mes_desembolso'] <= cosecha['Fecha_corte']]
 
 ###### añadiendo datos de cada corte mensual ##################################
-filtracion = df_monthly_snapshot[ df_monthly_snapshot['aux col filtrado'] != 'finalizado' ]
+filtracion = df_monthly_snapshot[ df_monthly_snapshot['condicion_actual_del_credito'] != 'FINALIZADO' ]
 
-filtracion = filtracion[['Fecha_corte', 'codigo_de_contrato', 'Saldo Capital', 'Saldo Capital_soles',
+filtracion = filtracion[['fecha_corte', 'codigo_de_contrato', 'saldo capital', 'saldo capital_soles',
                          'fecha proximo pago', 'dias atraso', 
                          
                          'par 0', 'par 15',
@@ -713,17 +784,17 @@ filtracion = filtracion[['Fecha_corte', 'codigo_de_contrato', 'Saldo Capital', '
 
                          ]]
 
-filtracion['indice_compuesto'] = filtracion['Fecha_corte'].astype(str) + filtracion['codigo_de_contrato']
+filtracion['indice_compuesto'] = filtracion['fecha_corte'].astype(str) + filtracion['codigo_de_contrato']
 filtracion = filtracion.drop_duplicates(subset = 'indice_compuesto')
 del filtracion['indice_compuesto']
 
+cosecha.rename(columns = {'Fecha_corte': 'fecha_corte'}, inplace = True)
 cosecha = cosecha.merge(filtracion,
-                         on  = ['Fecha_corte', 'codigo_de_contrato'],
+                         on  = ['fecha_corte', 'codigo_de_contrato'],
                          how = 'left')
 
-cosecha = cosecha[ cosecha['fecha_de_desembolso'] <= cosecha['Fecha_corte'] ]
+cosecha = cosecha[ cosecha['fecha_de_desembolso'] <= cosecha['fecha_corte'] ]
 
-print('añadir que las operaciones ampliaciones no se agrupen por código de contrato')
 #%%
 # ==== CONFIGURACIÓN ==== 
 bucket_name = "prod-datalake-raw-730335218320" 
@@ -752,5 +823,9 @@ if crear_excels == True:
                    index = False,
                    sep = ',')
 
+#%%
+print('')
+print(f'datos actualizados para el corte {fecha_corte}')
+print('')
 #%%
 print('fin')

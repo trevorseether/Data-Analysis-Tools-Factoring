@@ -39,8 +39,8 @@ conn = connect(
     )
 
 #%%
-fecha_corte = '2025-08' # YYYY-MM
-ubi = r'C:\Users\Joseph Montoya\Desktop\reporte semanal contabilidad\2025\08\primera semana'
+fecha_corte = '2025-11' # YYYY-MM
+ubi = r'C:\Users\Joseph Montoya\Desktop\reporte semanal contabilidad\2025\11'
 
 #%% lecturas
 # DIRECTORIO FIJO, NO CAMBIAR

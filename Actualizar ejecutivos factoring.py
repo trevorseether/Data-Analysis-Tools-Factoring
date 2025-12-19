@@ -58,6 +58,8 @@ df_actual['codmes'] = df_actual['codmes'].astype(int)
 
 df_actual.columns = df_actual.columns.str.lower()
 
+# df_actual = df_actual.head(0)
+
 #%% LECTURA DE FUENTE PRINCIPAL
 # sobre este excel se pueden hacer las modificaciones
 df = pd.read_excel(r'G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a/BUSINESS ANALYTICS/FACTORING/COMISIONES/Ejecutivos Factoring/fac_ejecutivos.xlsx',
@@ -67,6 +69,8 @@ df = pd.read_excel(r'G:/.shortcut-targets-by-id/1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8
 df = df.drop(df.filter(regex="Unnamed").columns, axis=1)
 
 df.columns = df.columns.str.lower()
+
+df['flag de actividad'] = df['flag de actividad'].astype(int)
 
 #%%
 from datetime import datetime, timedelta
@@ -125,7 +129,8 @@ s3.put_object(
 )
 
 print(f"✅ Archivo subido a s3://{bucket_name}{s3_key}")
-
+print('')
+print(f'cargado es mes {codmes}')
 
 
 

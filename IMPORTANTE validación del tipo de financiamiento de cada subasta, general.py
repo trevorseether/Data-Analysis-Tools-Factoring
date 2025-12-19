@@ -207,15 +207,23 @@ import pandas as pd
 
 
 # cartera
-data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202510) 10-11-2025.xlsx')
+data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202511) 15-12-2025.xlsx',
+                     usecols=['Codigo de Subasta',
+                                 'fecha_cierre',
+                                 'Cierre',
+                                 'amount_financed',
+                                 'amount_financed_soles',
+                                 'remaining_capital',
+                                 'Saldo Capital soles'])
+
 data['Codigo de Subasta'] = data['Codigo de Subasta'].str.lower()
 
 # cosecha propia
-cosecha = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA cosecha factoring (202510) 10-11-2025.xlsx')
+cosecha = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA cosecha factoring (202511) 15-12-2025.xlsx')
 cosecha['Codigo de Subasta'] = cosecha['Codigo de Subasta'].str.lower()
 
 
-proporciones = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/tipo financiamiento online 202510.xlsx')
+proporciones = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/tipo financiamiento online.xlsx')
 proporciones['CODE'] = proporciones['CODE'].str.lower()
 proporciones = proporciones.drop_duplicates(subset=['CODE'], keep='first')
 proporciones = proporciones[['CODE', 'CROWD', 'GESTORA', 'ONBALANCE']]
@@ -249,10 +257,12 @@ data['ONBALANCE'] = data['ONBALANCE'].astype(float)
 data['suma'] = data['CROWD'] + data['GESTORA'] + data['ONBALANCE']
 data['suma'] = data['suma'].fillna(0)
 
+data['amount_financed_soles'] = data['amount_financed_soles'].fillna(0)
 import numpy as np
+# data['g copia'] = data['GESTORA'].copy()
 data['GESTORA']  = np.where(data['suma'] == 0,
                           data['amount_financed_soles'],
-                          data['CROWD'])
+                          0)
 
 
 
@@ -271,7 +281,9 @@ for columna in ['amount_financed_soles', 'Saldo Capital soles']:
     data[f'gestora_{columna}']   = data[columna] * data['gestora %']
     data[f'onbalance_{columna}'] = data[columna] * data['onbalance %']
 
+print('si está vacío y el origen es online, debería ser crowd')
 print('si está vacío, debe ser gestora')
+
 #%%
 cosecha = cosecha[['Codigo de Subasta']]
 

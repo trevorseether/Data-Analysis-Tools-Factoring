@@ -26,7 +26,7 @@ hoy_formateado = datetime.today().strftime('%Y-%m-%d')
 #%%
 ubi = r'C:\Users\Joseph Montoya\Desktop\loans tape\2025 10' # se creará automáticamente
 
-cierre = 202510
+cierre = 202511
 
 crear_excel = True # True o False para crear excel
 
