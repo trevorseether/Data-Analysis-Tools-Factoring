@@ -22,6 +22,10 @@ from datetime import datetime
 import warnings
 warnings.filterwarnings("ignore")
 
+#%%
+fecha_ = pd.Timestamp('2025-10-21')
+limit_ = pd.Timestamp('2025-12-20')
+
 #%% Credenciales de AmazonAthena
 import json
 with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
@@ -309,8 +313,8 @@ df["Fecha de Cierre Final"] = df.apply(ajuste_fecha_cierre_final, axis = 1)
 del df['FECHA_PAGO_HUB_TICKETS']
 
 #%%
-fecha_ = pd.Timestamp('2024-10-20')
-df_filtrado = df[df["Fecha de Cierre Final"] >= fecha_]
+# fecha_ = pd.Timestamp('2024-10-20')
+df_filtrado = df[ (df["Fecha de Cierre Final"] >= fecha_) & (df["Fecha de Cierre Final"] <= limit_)]
 
 #%%
 query = ''' 
@@ -358,12 +362,16 @@ df_filtrado['PARTICIPANTE_ORIGEN'] = '856'
 #%%%
 df_final = df_filtrado[['TIPO_COMPROBANTE','RUC_PROVEEDOR','SERIE','NUMERACION',
                         'NRO_AUTORIZACION','NRO_CUOTA','FECHA_EFECTIVA_PAGO','PARTICIPANTE_ORIGEN','Código de Subasta']]
+
+df_final['_t'] = pd.to_datetime(df_final['FECHA_EFECTIVA_PAGO'], dayfirst= True)
+df_final = df_final.sort_values( by = ['_t', 'Código de Subasta'], ascending = True)
+
+del df_final['_t']
 #%%
-import os
 os.chdir(r'C:\Users\Joseph Montoya\Desktop\pruebas\redencion de facturas')
 
-df_final.to_excel('RM-RD.xlsx')
+df_final.to_excel(f'RM-RD {str(fecha_)[0:10]}.xlsx', index = False)
 
-
-
+#%%
+print('fin')
 
