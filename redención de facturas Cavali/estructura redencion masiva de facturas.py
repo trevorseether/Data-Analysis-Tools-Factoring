@@ -367,10 +367,13 @@ df_final['_t'] = pd.to_datetime(df_final['FECHA_EFECTIVA_PAGO'], dayfirst= True)
 df_final = df_final.sort_values( by = ['_t', 'Código de Subasta'], ascending = True)
 
 del df_final['_t']
+
+df_final = df_final.reset_index(drop=True)
+
 #%%
 os.chdir(r'C:\Users\Joseph Montoya\Desktop\pruebas\redencion de facturas')
 
-df_final.to_excel(f'RM-RD {str(fecha_)[0:10]}.xlsx', index = False)
+df_final.to_excel(f'RM-RD {str(fecha_)[0:10]}.xlsx')
 
 #%%
 print('fin')

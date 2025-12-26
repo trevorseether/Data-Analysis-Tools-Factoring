@@ -214,7 +214,8 @@ data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEg
                                  'amount_financed',
                                  'amount_financed_soles',
                                  'remaining_capital',
-                                 'Saldo Capital soles'])
+                                 'Saldo Capital soles',
+                                 'FLAG_ORIGEN_OPERACION'])
 
 data['Codigo de Subasta'] = data['Codigo de Subasta'].str.lower()
 
@@ -236,7 +237,8 @@ data = data[['Codigo de Subasta',
             'amount_financed_soles',
             
             'remaining_capital',
-            'Saldo Capital soles'
+            'Saldo Capital soles',
+            'FLAG_ORIGEN_OPERACION'
             ]]
 
 data = data.merge(proporciones,
@@ -260,11 +262,12 @@ data['suma'] = data['suma'].fillna(0)
 data['amount_financed_soles'] = data['amount_financed_soles'].fillna(0)
 import numpy as np
 # data['g copia'] = data['GESTORA'].copy()
-data['GESTORA']  = np.where(data['suma'] == 0,
-                          data['amount_financed_soles'],
-                          0)
-
-
+data['GESTORA']  = np.where((data['suma'] == 0) & (data['FLAG_ORIGEN_OPERACION'] != 'online'),
+                             data['amount_financed_soles'],
+                             data['GESTORA'])
+data['CROWD']  = np.where((data['suma'] == 0) & (data['FLAG_ORIGEN_OPERACION'] == 'online'),
+                             data['amount_financed_soles'],
+                             data['CROWD'])
 
 data['suma'] = data['CROWD'] + data['GESTORA'] + data['ONBALANCE']
 
@@ -281,8 +284,15 @@ for columna in ['amount_financed_soles', 'Saldo Capital soles']:
     data[f'gestora_{columna}']   = data[columna] * data['gestora %']
     data[f'onbalance_{columna}'] = data[columna] * data['onbalance %']
 
-print('si está vacío y el origen es online, debería ser crowd')
-print('si está vacío, debe ser gestora')
+del data['FLAG_ORIGEN_OPERACION']
+
+#%% alerta
+# data['s'] = data['crowd_amount_financed_soles']+data['gestora_amount_financed_soles']+data['onbalance_amount_financed_soles']
+# aver = data[data['s'] == 0]
+
+# aver = proporciones[proporciones['CODE'] == 'l9g8jgbm']
+
+# aver = data[ data['Codigo de Subasta'] == 'l9g8jgbm']
 
 #%%
 cosecha = cosecha[['Codigo de Subasta']]
