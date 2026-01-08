@@ -20,7 +20,7 @@ import io
 from pyathena import connect
 
 #%% mes a actualizar
-codmes = '2025-12-31' # formato YYYY-MM-DD
+codmes = '2021-05-31' # formato YYYY-MM-DD
 
 #%% Credenciales de AmazonAthena
 with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
@@ -71,6 +71,11 @@ df = df.drop(df.filter(regex="Unnamed").columns, axis=1)
 df.columns = df.columns.str.lower()
 
 df['flag de actividad'] = df['flag de actividad'].astype(int)
+df['final_ejecutivo_id'] = df['final_ejecutivo_id'].str.strip()
+
+duplicados = df[df['final_ejecutivo_id'].duplicated(keep=False)]
+if duplicados.shape[0]:
+    print('alerta de duplicados en la final_ejecutivo_id ')
 
 #%%
 from datetime import datetime, timedelta
@@ -96,6 +101,9 @@ df = df[['corte_mensual', 'codmes'] + columnas]
 df_actual = df_actual[df_actual['corte_mensual'] != pd.Timestamp(codmes) ]
 
 df = pd.concat([df_actual, df], ignore_index = True)
+
+# ordenaditos
+df = df.sort_values(['codmes', 'ejecutivo_final'], ascending = [False, True])
 
 #%%
 nombre_tabla = 'fac_ejecutivos'
@@ -130,7 +138,11 @@ s3.put_object(
 
 print(f"✅ Archivo subido a s3://{bucket_name}{s3_key}")
 print('')
-print(f'cargado es mes {codmes}')
+print(f'cargado el mes {codmes}')
+
+#%%
+if duplicados.shape[0]:
+    print('alerta de duplicados en la final_ejecutivo_id ')
 
 
 

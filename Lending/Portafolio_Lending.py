@@ -149,6 +149,7 @@ df_monthly_snapshot = df_monthly_snapshot[ df_monthly_snapshot['fecha_corte'] < 
 df_monthly_snapshot['codmes'] = df_monthly_snapshot['codmes'].astype(int)
 
 del df_monthly_snapshot['_timestamp']
+
 #%% Fecha finalización de la operación
 # cálculo para validaciones sacando la máxima fecha del BD_PAGOS
 bd_pagos['flag_finalizado'] = (
@@ -601,6 +602,26 @@ df_temp['monto recuperado_soles'] = np.maximum(df_temp['monto recuperado_soles']
 del df_temp['saldo castigado']
 del df_temp['saldo castigado_soles']
 
+#%% cálculo del recuperado solo en el mes
+bd_pagos['Fecha de pago del cliente'] = pd.to_datetime(bd_pagos['Fecha de pago del cliente'], errors='coerce')
+bd_pagos['mes pago'] = bd_pagos['Fecha de pago del cliente'] + pd.offsets.MonthEnd(0)
+
+df_cap_pagado_en_mes = bd_pagos.pivot_table(values  = 'Capital pagado',
+                                            index   = ['mes pago', 'Codigo de prestamo'],
+                                            aggfunc = 'sum').reset_index()
+df_cap_pagado_en_mes.rename(columns = {'Capital pagado': 'cap pagado en ese mes'}, inplace = True)
+
+df_temp = df_temp.merge(df_cap_pagado_en_mes,
+                        left_on  = ['fecha_corte', 'codigo_de_prestamo'],
+                        right_on = ['mes pago', 'Codigo de prestamo'],
+                        how = 'left')
+del df_temp['mes pago']
+del df_temp['Codigo de prestamo']
+
+df_temp['recuperado_m'] = np.where(df_temp['castigado_pero_recuperado'].notna(),
+                                   df_temp['cap pagado en ese mes'],
+                                   0)
+
 #%% ordenamient
 cols_para_ordenamiento = ['fecha_corte', 'codmes', 'exchange_rate', 'codigo_de_contrato',
        'codigo_de_prestamo', 'tipo_de_persona', 'tipo_de_cliente',
@@ -638,7 +659,9 @@ cols_para_ordenamiento = ['fecha_corte', 'codmes', 'exchange_rate', 'codigo_de_c
        
        'q_desembolso', 'm_desembolso', 'm_desembolso_soles', 
        'clasificacion', '% provision',
-       'provision', 'provision_soles', 'dias_atraso_>150', 'flag_castigado', 'castigado_pero_recuperado', 'mes_castigo', 'monto recuperado', 'monto recuperado_soles']
+       'provision', 'provision_soles', 'dias_atraso_>150', 'flag_castigado', 'castigado_pero_recuperado', 'mes_castigo', 'monto recuperado', 'monto recuperado_soles',
+        'recuperado_m', 
+       ]
 
 df_temp = df_temp[cols_para_ordenamiento]
 
@@ -709,6 +732,12 @@ s3.put_object(Bucket  = bucket_name,
               )
 
 print(f"✅ portafolio monthly snapshot subido a s3://{bucket_name}/{s3_key}")
+
+if crear_excels == True:
+    df_monthly_snapshot.to_csv(r'G:\.shortcut-targets-by-id\1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a\BUSINESS ANALYTICS\Lending\portafolio_lending\portafolio_lending_monthly_snapshot.csv',
+                   index    = False,
+                   sep      = ',',
+                   encoding = 'utf-8-sig')
 
 #%%
 # =============================================================================
