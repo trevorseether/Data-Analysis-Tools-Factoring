@@ -239,6 +239,7 @@ query = '''
         CASE
             WHEN hubspot_owner_id = '407980810' THEN 'Priscila Quispe (pquispe@tandia.pe)'
             WHEN hubspot_owner_id = '76146626'  THEN 'Priscila García (pgarcia@tandia.pe)'
+            WHEN hubspot_owner_id = '83054300'  THEN 'Priscila Prestalibre (comercial.prestalibre@prestamype.com)'
             ELSE hubspot_owner_id
             END AS propietario_negocio
     FROM prod_datalake_master.hubspot__deal
