@@ -218,26 +218,38 @@ hubspots.to_excel(r'C:\Users\Joseph Montoya\Desktop\pruebas\tipo financiamiento 
 # =============================================================================
 import pandas as pd
 
-
 # cartera
-data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202512) 12-01-2026.xlsx',
-                     usecols=['Codigo de Subasta',
-                                 'fecha_cierre',
-                                 'Cierre',
-                                 'amount_financed',
-                                 'amount_financed_soles',
-                                 'remaining_capital',
-                                 'Saldo Capital soles',
-                                 'FLAG_ORIGEN_OPERACION'])
+query = '''   
+select 
+    code as "Codigo de Subasta"
+    ,fecha_cierre as "fecha_cierre"
+    ,codmes as  "Cierre"
+    ,amount_financed as "amount_financed"
+    ,amount_financed_soles as "amount_financed_soles"
+    ,remaining_capital as  "remaining_capital"
+    ,remaining_capital_soles as "Saldo Capital soles"
+    ,FLAG_ORIGEN_OPERACION as "FLAG_ORIGEN_OPERACION"
 
+from prod_datalake_master.ba__fac_outstanding_monthly_snapshot
+
+'''
+
+cursor = conn.cursor()
+cursor.execute(query)
+
+# Obtener los resultados
+resultados = cursor.fetchall()
+
+# Obtener los nombres de las columnas
+column_names = [desc[0] for desc in cursor.description]
+
+# Convertir los resultados a un DataFrame de pandas
+data = pd.DataFrame(resultados, columns = column_names)
 data['Codigo de Subasta'] = data['Codigo de Subasta'].str.lower()
 
-# cosecha propia
-cosecha = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA cosecha factoring (202512) 12-01-2026.xlsx')
-cosecha['Codigo de Subasta'] = cosecha['Codigo de Subasta'].str.lower()
-
+#%%%
 # proporciones antiguo:
-proporciones = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/tipo financiamiento online.xlsx')
+# proporciones = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/tipo financiamiento online.xlsx')
 
 #nueva lógica para obtener las proporciones
 df_final      = df[['CODE', 'CROWD', 'GESTORA', 'ONBALANCE']]
@@ -316,33 +328,12 @@ del data['FLAG_ORIGEN_OPERACION']
 # aver = data[ data['Codigo de Subasta'] == 'l9g8jgbm']
 
 #%%
-cosecha = cosecha[['Codigo de Subasta']]
-
-sin_dups = data.drop_duplicates(subset = 'Codigo de Subasta')
-
-cosecha = cosecha.merge(sin_dups[['Codigo de Subasta',
-                                  'CROWD',
-                                  'GESTORA',
-                                  
-                                  'ONBALANCE',
-                                  'suma',
-                                  'crowd %',
-                                  'gestora %',
-                                  'onbalance %',
-                                  'crowd_amount_financed_soles',
-                                  'gestora_amount_financed_soles',
-                                  'onbalance_amount_financed_soles']],
-                        on  = 'Codigo de Subasta',
-                        how = 'left')
-
-#%%
 from datetime import datetime
 hoy_formateado = datetime.today().strftime('%d-%m-%Y')
 #data.to_excel(rf'C:\Users\Joseph Montoya\Desktop\pruebas\columnas adicionales {hoy_formateado}.xlsx')
 
 with pd.ExcelWriter(rf'C:\Users\Joseph Montoya\Desktop\pruebas\columnas adicionales {hoy_formateado}.xlsx', engine="xlsxwriter") as writer:
     data.to_excel(writer, sheet_name="portafolio", index=False)
-    cosecha.to_excel(writer, sheet_name="cosecha", index=False)
 
 #%%
 print('fin')
