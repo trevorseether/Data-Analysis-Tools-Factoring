@@ -16,7 +16,7 @@ peru_tz = timezone(timedelta(hours=-5))
 today_date = datetime.now(peru_tz).strftime('%Y%m%d')
 
 import os
-os.chdir(r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202510 existing')
+os.chdir(r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202512 existing')
 
 #%%
 payments_file_last_cierre = pd.read_excel(f'./payments_{today_date}_current_loans.xlsx')

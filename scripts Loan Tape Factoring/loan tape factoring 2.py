@@ -24,9 +24,10 @@ from datetime import datetime
 hoy_formateado = datetime.today().strftime('%Y-%m-%d')
 
 #%%
-ubi = r'C:\Users\Joseph Montoya\Desktop\loans tape\2025 10' # se creará automáticamente
 
-cierre = 202511
+cierre = 202512
+
+ubi = rf'C:\Users\Joseph Montoya\Desktop\loans tape\{cierre}' # se creará automáticamente
 
 crear_excel = True # True o False para crear excel
 
@@ -770,7 +771,7 @@ e1 = """.=+CONTARA('Individual Loan Checks'!A:A)-1"""
 e2 = """.=+CONTARA(UNICOS('Loans File'!B:B))-1"""
 e3 = """.=+CONTAR.SI.CONJUNTO('Loans File'!$H$2:$H$28080;"CLOSED")"""
 e4 = """.=CONTAR.SI.CONJUNTO('Loans File'!H:H;"CURRENT";'Loans File'!AQ:AQ;">"&90)"""
-e5 = """.=+SUMA('Payments File'!D:D)"""
+e5 = """.=+SUMA('Payments File'!E:E)"""
 e6 = """.=+SUMA('Individual Loan Checks'!D:D)"""
 e7 = """.=+SUMA('Individual Loan Checks'!I:I)"""
 e8 = """.=+SUMAR.SI.CONJUNTO('Loans File'!Y:Y;'Loans File'!H:H;"CURRENT")"""

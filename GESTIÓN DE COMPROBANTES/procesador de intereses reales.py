@@ -122,9 +122,9 @@ df_online = df_online[['Subasta',
                        'Interés Moratorio\n15 / 03 en adelante(3)']]
 
 df_online = df_online.merge(df_emitidos[['COM. VINCULADO','COMPROBANTE EMITIDO', 'FECHA DE EMISIÓN']],
-                            left_on = 'Comprobante_costo_financiamiento',
+                            left_on  = 'Comprobante_costo_financiamiento',
                             right_on = 'COM. VINCULADO',
-                            how = 'left')
+                            how      = 'left')
 
 del df_online['COM. VINCULADO']
 

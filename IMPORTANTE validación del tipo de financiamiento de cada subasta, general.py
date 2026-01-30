@@ -218,7 +218,6 @@ hubspots.to_excel(r'C:\Users\Joseph Montoya\Desktop\pruebas\tipo financiamiento 
 # =============================================================================
 import pandas as pd
 
-
 # cartera
 data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202512) 12-01-2026.xlsx',
                      usecols=['Codigo de Subasta',
@@ -237,7 +236,7 @@ cosecha = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2t
 cosecha['Codigo de Subasta'] = cosecha['Codigo de Subasta'].str.lower()
 
 # proporciones antiguo:
-proporciones = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/tipo financiamiento online.xlsx')
+# proporciones = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/pruebas/tipo financiamiento online.xlsx')
 
 #nueva lógica para obtener las proporciones
 df_final      = df[['CODE', 'CROWD', 'GESTORA', 'ONBALANCE']]

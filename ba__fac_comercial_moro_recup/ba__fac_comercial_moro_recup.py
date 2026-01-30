@@ -8,6 +8,8 @@ Created on Fri Nov 28 10:14:41 2025
 # =============================================================================
 #    Actualizar ejecutivos factoring
 # =============================================================================
+import time
+inicio = time.perf_counter()
 
 import pandas as pd
 import boto3
@@ -19,7 +21,7 @@ import io
 from pyathena import connect
 
 #%% mes para insertar
-codmes = '2025-12-31'
+codmes = '2025-05-31'
 
 #%% Credenciales de AmazonAthena
 with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
@@ -64,6 +66,7 @@ df.columns = df.columns.str.lower()
 
 df = df [df['periodo_cierre'] == int(codmes_yyyymm) ]
 
+print(1)
 #%% columna _timestamp
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -74,6 +77,7 @@ now = datetime.now(ZoneInfo("America/Lima"))
 # Guardar directamente el objeto datetime
 df["_timestamp"] = now - timedelta(hours=5)
 
+print(2)
 #%% leer datos estaticos de meses anteriores
 query = ''' select * from prod_datalake_sandbox.ba__fac_comercial_moro_recup '''
 
@@ -94,11 +98,13 @@ df_estatico['periodo_cierre'] = df_estatico['periodo_cierre'].astype(int)
 
 df_estatico = df_estatico[df_estatico['periodo_cierre'] != int(codmes_yyyymm)]
 
+print(3)
 #%% concatenación para incluir el mes actual
 df_final = pd.concat([df_estatico, df], ignore_index = True)
 
 df_final = df_final.sort_values(by = ['periodo_cierre', 'ejecutivo', 'codigo_subasta'], ascending = [False, True, True])
 
+print(4)
 #%% CARGA AL LAKE
 nombre_tabla = 'fac_comercial_moro_recup'
 
@@ -132,6 +138,16 @@ s3.put_object(
 
 print(f"✅ Archivo subido a s3://{bucket_name}{s3_key}")
 
+print(5)
 #%%
 print('fin')
+print('')
+print(f'actualizado el mes {codmes}')
+print('')
 
+fin = time.perf_counter()
+
+duracion_segundos = fin - inicio
+duracion_minutos = duracion_segundos / 60
+
+print(f"Tiempo de ejecución: {duracion_minutos:.2f} minutos")

@@ -19,7 +19,7 @@ today_date = datetime.now(peru_tz).strftime('%Y%m%d')
 #%%
 crear_excel = True # crear excel, True o False
 cargar_lake = True # cargar al lake, True o False
-cierre = '202510'
+cierre = '202512'
 os.chdir(rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} existing')
 
 path_new      = rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} news'

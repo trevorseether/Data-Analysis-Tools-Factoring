@@ -60,7 +60,7 @@ if fac_costo_fi.shape[0]>0:
     df_costo_items['aux1'] = fac_costo_fi['Codigo_de_Subasta']
     df_costo_items['Grupo'] = np.arange(1, len(df_costo_items) + 1)
     df_costo_items['Código del item'] = fac_costo_fi['Codigo_de_Subasta']
-    df_costo_items['Descripción del item'] = 'Ajuste al descuento por operación de Factoring en referencia el Contrato Empresario.'
+    df_costo_items['Descripción del item'] = 'Descuento por operación de Factoring en referencia el Contrato Empresario. El descuento es realizado por Factoring Prestamype.'
     df_costo_items['Unidad del item'] = 'ZZ'
     df_costo_items['Cantidad del item'] = '1'
     df_costo_items['Precio del item'] = round(fac_costo_fi['Costo_Financiamiento_teorico'].round(2),2)

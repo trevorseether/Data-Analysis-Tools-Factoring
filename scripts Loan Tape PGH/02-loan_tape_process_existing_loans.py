@@ -22,8 +22,8 @@ def sum_date(codmes,months):
     return datetime.strftime(temp,'%Y%m')
 
 #%%
-cierre = '202510'
-ubi = r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202510 existing'
+cierre = '202512'
+ubi = r'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\202512 existing'
 
 fecha_cierre = pd.to_datetime(cierre, format='%Y%m') + pd.offsets.MonthEnd(0)
 
