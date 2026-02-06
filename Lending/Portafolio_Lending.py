@@ -23,7 +23,7 @@ import io
 from pyathena import connect
 
 #%%
-fecha_corte = '2025-12-31' # YYYY-MM-DD
+fecha_corte = '2026-01-31' # YYYY-MM-DD
 crear_excels = True # True o False
 
 #%% Credenciales de AmazonAthena
@@ -622,7 +622,7 @@ del df_temp['Codigo de prestamo']
 df_temp['recuperado_m'] = np.where(df_temp['castigado_pero_recuperado'].notna(),
                                    df_temp['cap pagado en ese mes'],
                                    0)
-
+# df_temp['recuperado_m'] = 0 # eliminar una vez que se tenga una casuistica real
 #%% ordenamient
 cols_para_ordenamiento = ['fecha_corte', 'codmes', 'exchange_rate', 'codigo_de_contrato',
        'codigo_de_prestamo', 'tipo_de_persona', 'tipo_de_cliente',
@@ -699,7 +699,7 @@ print(f"✅ portafolio dinámico subido a s3://{bucket_name}/{s3_key}")
 
 
 if crear_excels == True:
-    df_temp.to_csv(r'G:\.shortcut-targets-by-id\1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a\BUSINESS ANALYTICS\Lending\portafolio_lending\portafolio_lending.csv',
+    df_temp.to_csv(r'G:\.shortcut-targets-by-id\1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a\BUSINESS ANALYTICS\LENDING\REPORTES\portafolio_lending\portafolio_lending.csv',
                    index    = False,
                    sep      = ',',
                    encoding = 'utf-8-sig')
@@ -734,8 +734,10 @@ s3.put_object(Bucket  = bucket_name,
 
 print(f"✅ portafolio monthly snapshot subido a s3://{bucket_name}/{s3_key}")
 
+df_monthly_snapshot['recuperado_m'] = 0 # eliminar cuando ya se haya solucionado el cálculo de recuperaciones cuando hay castigos >150
+
 if crear_excels == True:
-    df_monthly_snapshot.to_csv(r'G:\.shortcut-targets-by-id\1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a\BUSINESS ANALYTICS\Lending\portafolio_lending\portafolio_lending_monthly_snapshot.csv',
+    df_monthly_snapshot.to_csv(r'G:\.shortcut-targets-by-id\1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a\BUSINESS ANALYTICS\LENDING\REPORTES\portafolio_lending\portafolio_lending_monthly_snapshot.csv',
                    index    = False,
                    sep      = ',',
                    encoding = 'utf-8-sig')
@@ -848,7 +850,7 @@ print(f"✅ Archivo subido a s3://{bucket_name}/{s3_key}")
 
 
 if crear_excels == True:
-    cosecha.to_csv(r'G:\.shortcut-targets-by-id\1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a\BUSINESS ANALYTICS\Lending\cosecha_lending\cosecha_lending.csv',
+    cosecha.to_csv(r'G:\.shortcut-targets-by-id\1wzewbtJQv6Fr_f0uKnZrRg-jPtPM9D8a\BUSINESS ANALYTICS\LENDING\REPORTES\cosecha_lending\cosecha_lending.csv',
                    encoding = 'utf-8-sig',
                    index = False,
                    sep = ',')
@@ -857,5 +859,10 @@ if crear_excels == True:
 print('')
 print(f'datos actualizados para el corte {fecha_corte}')
 print('')
+print('El Excel a actulizar es:')
+print('./BUSINESS ANALYTICS/LENDING/REPORTES/provisiones Lending.xlsx')
+print('')
+
+
 #%%
 print('fin')

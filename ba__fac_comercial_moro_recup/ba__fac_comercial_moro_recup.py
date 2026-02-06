@@ -21,7 +21,7 @@ import io
 from pyathena import connect
 
 #%% mes para insertar
-codmes = '2025-05-31'
+codmes = '2026-01-31'
 
 #%% Credenciales de AmazonAthena
 with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
@@ -47,6 +47,7 @@ athena = boto3.client(
 )
 
 # ID de la query guardada (lo ves en la URL de Athena)
+# nombre: Base_Morosidad_Recuperacion_Factoring.rmacuri
 named_query_id = "51eb3903-f7b6-4b2c-a527-c35765e74134"
 
 # Obtener SQL
@@ -56,7 +57,6 @@ cursor = conn.cursor()
 cursor.execute(query_sql)
 
 df = pd.DataFrame(cursor.fetchall(), columns=[c[0] for c in cursor.description])
-
 
 df['Periodo_Cierre'] = df['Periodo_Cierre'].astype(int)
 
