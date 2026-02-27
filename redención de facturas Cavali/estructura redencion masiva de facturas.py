@@ -23,8 +23,8 @@ import warnings
 warnings.filterwarnings("ignore")
 
 #%%
-fecha_ = pd.Timestamp('2025-10-21')
-limit_ = pd.Timestamp('2025-12-20')
+fecha_ = pd.Timestamp('2025-12-20')
+limit_ = pd.Timestamp('2026-01-31')
 
 #%% Credenciales de AmazonAthena
 import json

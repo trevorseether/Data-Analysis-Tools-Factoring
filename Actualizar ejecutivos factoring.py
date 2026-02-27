@@ -20,7 +20,7 @@ import io
 from pyathena import connect
 
 #%% mes a actualizar
-codmes = '2026-02-28' # formato YYYY-MM-DD
+codmes = '2020-12-31' # formato YYYY-MM-DD
 
 #%% Credenciales de AmazonAthena
 with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
@@ -59,6 +59,8 @@ df_actual['codmes'] = df_actual['codmes'].astype(int)
 df_actual.columns = df_actual.columns.str.lower()
 
 # df_actual = df_actual.head(0)
+#%% especificar tipo de dato de flag_comisiones
+df_actual['FLAG_COMISIONES'] = 0
 
 #%% LECTURA DE FUENTE PRINCIPAL
 # sobre este excel se pueden hacer las modificaciones
@@ -104,6 +106,14 @@ df = pd.concat([df_actual, df], ignore_index = True)
 
 # ordenaditos
 df = df.sort_values(['codmes', 'ejecutivo_final'], ascending = [False, True])
+
+df['flag_comisiones'] = df['flag_comisiones'].astype(float)
+
+df['canal']           = df['canal'].str.upper()
+df['zona']            = df['zona'].str.upper()
+df['cargo']           = df['cargo'].str.upper()
+df['nombre completo'] = df['nombre completo'].str.upper()
+df['equipo']          = df['equipo'].str.upper()
 
 #%%
 nombre_tabla = 'fac_ejecutivos'

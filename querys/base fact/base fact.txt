@@ -1,0 +1,108 @@
+CREATE OR REPLACE VIEW "base fact" AS 
+WITH
+  fechas_desembolso_hijas AS (
+   SELECT
+     fr.code code_clon
+   , fr.parent_code
+   , COALESCE(fr.interest_proforma_disbursement_date, fr2.interest_proforma_disbursement_date, HD.fecha_de_desembolso__factoring_, HD2.fecha_de_desembolso__factoring_, fr.proforma_disbursement_date, fr2.proforma_disbursement_date) fecha_desembolso
+   , fr2.interest_proforma_disbursement_date fecha_desembolso_madre
+   FROM
+     (((prod_datalake_analytics.fac_requests fr
+   LEFT JOIN prod_datalake_analytics.fac_requests fr2 ON (fr.parent_code = fr2.code))
+   LEFT JOIN (
+      SELECT *
+      FROM
+        prod_datalake_master.HUBSPOT__DEAL
+      WHERE ((pipeline = '14026011') AND (NOT (dealstage IN ('14026016', '14026018'))))
+   )  HD ON (lower(trim(BOTH FROM HD.DEALNAME)) = lower(trim(BOTH FROM FR.CODE))))
+   LEFT JOIN (
+      SELECT *
+      FROM
+        prod_datalake_master.HUBSPOT__DEAL
+      WHERE ((pipeline = '14026011') AND (NOT (dealstage IN ('14026016', '14026018'))))
+   )  HD2 ON (lower(trim(BOTH FROM HD2.DEALNAME)) = lower(trim(BOTH FROM FR.PARENT_CODE))))
+   WHERE ((fr.parent_code IS NOT NULL) AND (NOT (fr.status IN ('rejected', 'canceled'))))
+   ORDER BY fr.parent_code ASC
+) 
+, onlines AS (
+   SELECT
+     f.status Status_Requests
+   , f._id
+   , f.code
+   , (CASE WHEN (f.product = 'factoring') THEN f.company_name ELSE f.user_third_party_name END) company_name
+   , (CASE WHEN (f.product = 'factoring') THEN f.company_ruc ELSE f.user_third_party_ruc END) company_ruc
+   , (CASE WHEN (f.product = 'factoring') THEN f.user_third_party_name ELSE f.company_name END) user_third_party_name
+   , (CASE WHEN (f.product = 'factoring') THEN f.user_third_party_ruc ELSE f.company_ruc END) user_third_party_ruc
+   , lower(f.product) product
+   , (CASE WHEN (f.product = 'factoring') THEN f.proforma_simulation_financing_advance ELSE f.proforma_simulation_financing END) Monto_de_adelanto
+   , (CASE WHEN (f.product = 'factoring') THEN f.proforma_simulation_financing_total ELSE f.proforma_simulation_financing END) Monto_Financiado
+   , f.proforma_simulation_currency currency
+   , (CASE WHEN (f.product = 'factoring') THEN f.proforma_financing_interest_rate ELSE f.proforma_simulation_financing_cost_rate END) tasa_de_financiamiento_asignada
+   , CAST((f.closed_at - INTERVAL  '5' HOUR) AS DATE) fecha_de_cierre
+   , CAST((f.created_at - INTERVAL  '5' HOUR) AS DATE) fecha_de_inicio
+   , (CASE WHEN (f.code = 'AVYCXw61') THEN DATE('2024-12-30') WHEN (f.code = 'EO0jadUj') THEN DATE('2025-01-20') ELSE COALESCE(CAST(FD_CLONES.fecha_desembolso AS DATE), CAST((f.interest_proforma_disbursement_date - INTERVAL  '5' HOUR) AS DATE)) END) fecha_desembolso_admin
+   , DATE(f.proforma_client_payment_date_expected) Fecha_esperada_pago
+   , (CASE WHEN (f.product = 'factoring') THEN (f.proforma_simulation_financing_commission + f.proforma_simulation_financing_commission_igv) ELSE (f.proforma_simulation_commission + f.proforma_simulation_commission_igv) END) comision_total
+   , (CASE WHEN (f.product = 'factoring') THEN f.proforma_simulation_financing_commission ELSE f.proforma_simulation_commission END) comision_sin_igv
+   , COALESCE(DATE(fac_disb.fecha_de_desembolso_proveedor), DATE(HDFD.Fecha_Minima_de_Desembolso)) Fecha_de_desembolso_hub
+   , '' flag_es_offline
+   FROM
+     (((prod_datalake_analytics.fac_requests f
+   LEFT JOIN fechas_desembolso_hijas FD_CLONES ON (FD_CLONES.code_clon = F.CODE))
+   LEFT JOIN prod_datalake_master.factoring__fac_auctions_disbursement_date fac_disb ON (f.code = fac_disb.codigo_de_subasta))
+   LEFT JOIN (
+      SELECT DISTINCT
+        dealname code
+      , fecha_de_desembolso__factoring_ Fecha_Minima_de_Desembolso
+      FROM
+        prod_datalake_master.HUBSPOT__DEAL
+      WHERE ((pipeline = '14026011') AND (NOT (dealstage IN ('14026016', '14026018'))))
+   )  HDFD ON (UPPER(trim(BOTH FROM f.code)) = UPPER(trim(BOTH FROM HDFD.code))))
+   WHERE ((NOT (f.Status IN ('rejected', 'canceled'))) AND (COALESCE(fac_disb.fecha_de_desembolso_proveedor, f.interest_proforma_disbursement_date, HDFD.Fecha_Minima_de_Desembolso, FD_CLONES.fecha_desembolso) IS NOT NULL))
+) 
+, offlines AS (
+   SELECT
+     hubspot__deal.tipo_de_pago Status_Requests
+   , null _id
+   , hubspot__deal.dealname Code
+   , hubspot__deal.proveedor company_name
+   , CAST(hubspot__deal.ruc_proveedor AS VARCHAR) company_ruc
+   , hubspot__deal.cliente user_third_party_name
+   , hubspot__deal.ruc_cliente user_third_party_ruc
+   , lower(hubspot__deal.tipo_de_producto) product
+   , hubspot__deal.monto_adelanto monto_de_adelanto
+   , hubspot__deal.monto_financiado monto_financiado
+   , hubspot__deal.moneda_del_monto_financiado Moneda_Monto_Financiado
+   , (CASE WHEN (CAST(REPLACE(REPLACE(hubspot__deal.tasa_de_financiamiento____, '%', ''), ',', '.') AS DOUBLE) > 6E-1) THEN (CAST(REPLACE(REPLACE(hubspot__deal.tasa_de_financiamiento____, '%', ''), ',', '.') AS DOUBLE) / 100) ELSE CAST(REPLACE(REPLACE(hubspot__deal.tasa_de_financiamiento____, '%', ''), ',', '.') AS DOUBLE) END) tasa_de_financiamiento_asignada
+   , CAST((hubspot__deal.closedate - INTERVAL  '5' HOUR) AS DATE) fecha_de_cierre
+   , CAST((hubspot__deal.createdate - INTERVAL  '5' HOUR) AS DATE) fecha_de_inicio
+   , null fecha_desembolso_admin
+   , hubspot__deal.fecha_de_pago__factoring_ fecha_esperada_pago
+   , hubspot__deal.comision_estructuracion comision_total
+   , round((hubspot__deal.comision_estructuracion * (1 / 1.18E0)), 2) comision_sin_igv
+   , COALESCE(DATE(fac_disb.fecha_de_desembolso_proveedor), DATE(fecha_de_desembolso__factoring_)) Fecha_de_desembolso_hub
+   , 'si' flag_es_offline
+   FROM
+     (prod_datalake_master.hubspot__deal hubspot__deal
+   LEFT JOIN prod_datalake_master.factoring__fac_auctions_disbursement_date fac_disb ON (hubspot__deal.codigo_de_subasta = fac_disb.codigo_de_subasta))
+   WHERE ((hubspot__deal.pipeline = '14026011') AND (NOT (hubspot__deal.dealstage IN ('14026016', '14026018', '1115970054', '1105313628'))) AND (length(dealname) > 10) AND (hubspot__deal.fecha_de_desembolso__factoring_ IS NOT NULL))
+) 
+, unidos AS (
+   SELECT *
+   FROM
+     onlines
+UNION ALL    SELECT *
+   FROM
+     offlines
+   WHERE (NOT (code IN (SELECT DISTINCT code
+FROM
+  onlines
+)))
+) 
+SELECT *
+FROM
+  unidos
+WHERE (NOT (code IN (SELECT parent_code
+FROM
+  fechas_desembolso_hijas
+)))
