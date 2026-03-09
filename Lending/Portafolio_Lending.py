@@ -23,7 +23,7 @@ import io
 from pyathena import connect
 
 #%%
-fecha_corte = '2026-01-31' # YYYY-MM-DD
+fecha_corte = '2026-02-28' # YYYY-MM-DD
 crear_excels = True # True o False
 
 #%% Credenciales de AmazonAthena
