@@ -19,7 +19,7 @@ today_date = datetime.now(peru_tz).strftime('%Y%m%d')
 #%%
 crear_excel = True # crear excel, True o False
 cargar_lake = True # cargar al lake, True o False
-cierre = '202512'
+cierre = '202601'
 os.chdir(rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} existing')
 
 path_new      = rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} news'
@@ -221,6 +221,135 @@ loans['int agrupado aux'] = loans['int agrupado aux'].fillna(0)
 
 loans['total_loan_amount'] = loans['principal_amount'].fillna(0) + loans['int agrupado aux']
 del loans['int agrupado aux']
+
+#%% añadiendo la zona
+from pyathena import connect
+import json
+with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
+    creds = json.load(f)
+
+conn = connect(
+    aws_access_key_id     = creds["AccessKeyId"],
+    aws_secret_access_key = creds["SecretAccessKey"],
+    aws_session_token     = creds["SessionToken"],
+    s3_staging_dir        = creds["s3_staging_dir"],
+    region_name           = creds["region_name"]
+    )
+
+query = '''
+
+with ubigeos as (
+select 
+    hi.hs_object_id,
+    coalesce(trim(upper(ubig.departamento)),  trim(upper(hi.departamento))) as departamento,
+    coalesce(trim(upper(ubig.provincia)), trim(upper(hi.provincia))) as provincia,
+    coalesce(trim(upper(ubig.distrito)), trim(upper(hi.distrito))) as distrito,
+    trim(upper(hi.ubigueo)) as ubigueo
+from prod_datalake_master.hubspot__inmueble as hi
+left join prod_datalake_master."transversal__ubigeos_inei_2022" as ubig
+on trim(lower(ubig.ubigeo)) = trim(lower(hi.ubigueo))
+--where hi.departamento = 'LIMA'
+
+), filtro as (
+
+select
+    *,
+    case 
+    when TRIM(lower(departamento)) = 'lima' and TRIM(lower(distrito)) in ('san isidro','la molina','santiago de surco','miraflores','san borja','barranco','cercado de lima','breña','la victoria','rimac','san luis','lima','san juan de lurigancho', 'santa anita','ate','el agustino','chaclacayo','cieneguilla','lurigancho chosica','jesus maria','lince','surquillo','pueblo libre','san miguel','magdalena del mar','los olivos','carabayllo','comas','independencia','san martin de porres','santa rosa','puente piedra','ancon','santa rosa','san juan de miraflores','villa maria del triunfo','pucusana', 'villa el salvador','chorrillos','san bartolo','punta hermosa','punta negra','santa maria', 'santa maria del mar', 'lurin', 'pachacamac') then 'LIMA METROPOLITANA'
+    when TRIM(lower(departamento)) = 'lima' and TRIM(lower(distrito)) in ('callao','bellavista','la perla','carmen de la legua','mi peru', 'ventanilla', 'la punta') then 'CALLAO'
+    WHEN TRIM(LOWER(departamento)) = 'callao' then 'CALLAO'
+    when TRIM(lower(departamento)) = 'lima' then 'LIMA PROVINCIA'
+    else 'FUERA DE LIMA'
+    END AS "ZONA"
+from ubigeos
+), loans as (
+
+select
+    distinct 
+    loan_id,
+    contract_id
+from prod_datalake_master.ba__data_portafolio_pgh
+
+), h_id as (     
+
+select
+    hd.codigo_de_contrato,
+    hd.pipeline,
+    hd.hs_object_id,
+    f.*
+from prod_datalake_master.hubspot__deal as hd
+left join (select * from prod_datalake_master.hubspot__associations where type = 'deal_to_inmueble') as ha
+on cast(ha.hs_object_id_1 as bigint) = cast(hd.hs_object_id as bigint)
+left join filtro as f 
+on cast(f.hs_object_id as bigint) = cast(ha.hs_object_id_2 as bigint)
+where hd.codigo_de_contrato is not null
+and hd.pipeline in ('6613542', '766601363')
+
+), con_loans as (
+
+select 
+    * 
+from h_id
+left join loans
+on codigo_de_contrato = contract_id
+
+), INFO_complementaria as (
+select
+    distinct 
+    loan_id,
+    zona_distrito,
+    case 
+    when zona_distrito in ('LIMA TOP', 'LIMA SUR', 'LIMA ESTE', 'LIMA MODERNA', 'LIMA NORTE', 'LIMA CENTRO') THEN 'LIMA METROPOLITANA'
+    when zona_distrito in ('CALLAO') then 'CALLAO'
+    WHEN zona_distrito in ('LIMA PROVINCIAS') then 'LIMA PROVINCIA'
+    else 'FUERA DE LIMA'
+    end as "ZONA"
+from prod_datalake_master.ba__data_portafolio_pgh
+where zona_distrito is not null
+
+), final_ as (  
+
+select
+    cl.codigo_de_contrato
+    ,cl.pipeline
+    ,cl.departamento
+    ,cl.provincia
+    ,cl.distrito
+    ,cl.ubigueo
+    ,COALESCE(cl.ZONA, IC.ZONA) AS ZONA
+    ,cl.loan_id
+    ,cl.contract_id
+from con_loans as cl
+left join INFO_complementaria as ic
+on cl.loan_id = ic.loan_id
+
+)
+select * from final_ 
+
+
+'''
+cursor = conn.cursor()
+cursor.execute(query)
+
+# Obtener los resultados
+resultados = cursor.fetchall()
+
+# Obtener los nombres de las columnas
+column_names = [desc[0] for desc in cursor.description]
+
+# Convertir los resultados a un DataFrame de pandas
+zonas = pd.DataFrame(resultados, columns = column_names)
+zonas = zonas[zonas['loan_id'].notna()]
+zonas_cols = zonas[['loan_id', 'ZONA']]
+zonas_cols = zonas_cols.drop_duplicates(subset = 'loan_id', keep = 'first')
+#%% UNION
+loans = loans.merge(zonas_cols,
+                    on  = 'loan_id',
+                    how = 'left')
+# del loans['ZONA']
+individuals = individuals.merge(zonas_cols,
+                                on  = 'loan_id',
+                                how = 'left')
 
 #%%
 '''

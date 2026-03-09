@@ -20,7 +20,7 @@ import io
 from pyathena import connect
 
 #%% mes a actualizar
-codmes = '2020-12-31' # formato YYYY-MM-DD
+codmes = '2026-03-31' # formato YYYY-MM-DD
 
 #%% Credenciales de AmazonAthena
 with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
@@ -32,7 +32,6 @@ conn = connect(
     aws_session_token     = creds["SessionToken"],
     s3_staging_dir        = creds["s3_staging_dir"],
     region_name           = creds["region_name"]
-    
     )
 
 #%%
@@ -114,6 +113,36 @@ df['zona']            = df['zona'].str.upper()
 df['cargo']           = df['cargo'].str.upper()
 df['nombre completo'] = df['nombre completo'].str.upper()
 df['equipo']          = df['equipo'].str.upper()
+
+df = df[ df['final_ejecutivo_id'].notna()]
+
+df['flag_comisiones'] = df['flag_comisiones'].astype(str).str.replace('.0', '')
+df['flag_comisiones'] = df['flag_comisiones'].fillna('')
+
+#%%
+# datos_para_multiplicar = df[df['corte_mensual'] == pd.Timestamp('2024-12-31')]
+# del datos_para_multiplicar['corte_mensual']
+# datos_ya_cargados = df[df['corte_mensual'] > pd.Timestamp('2024-12-31')]
+
+# datos_por_corregir = df[df['corte_mensual'] <= pd.Timestamp('2024-12-31')]
+# datos_por_corregir = datos_por_corregir[['corte_mensual']]
+# datos_por_corregir = datos_por_corregir.drop_duplicates(subset = 'corte_mensual')
+# datos_por_corregir['a'] = 'a'
+# datos_para_multiplicar['a'] = 'a'
+
+# nuevos = datos_por_corregir.merge(datos_para_multiplicar,
+#                                   on = 'a',
+#                                   how = 'left')
+# del nuevos['a']
+
+# df = pd.concat([datos_ya_cargados,nuevos], ignore_index = True)
+
+# df['corte_mensual'] = pd.to_datetime( df['corte_mensual'] )
+# df['codmes'] = df['corte_mensual'].dt.strftime('%Y%m')
+# df['codmes'] = df['codmes'].astype(int)
+
+# df = df.sort_values(['codmes', 'ejecutivo_final'], ascending = [False, True])
+
 
 #%%
 nombre_tabla = 'fac_ejecutivos'

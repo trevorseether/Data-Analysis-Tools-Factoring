@@ -25,6 +25,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 os.chdir(r'C:\Users\Joseph Montoya\Desktop\pruebas')
+
 #%%
 os.chdir(r'C:\Users\Joseph Montoya\Desktop\cartera factoring')
 

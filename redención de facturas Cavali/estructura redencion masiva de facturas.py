@@ -23,8 +23,8 @@ import warnings
 warnings.filterwarnings("ignore")
 
 #%%
-fecha_ = pd.Timestamp('2025-12-20')
-limit_ = pd.Timestamp('2026-01-31')
+fecha_ = pd.Timestamp('2026-02-01')
+limit_ = pd.Timestamp('2026-02-28')
 
 #%% Credenciales de AmazonAthena
 import json
@@ -373,7 +373,7 @@ df_final = df_final.reset_index(drop=True)
 #%%
 os.chdir(r'C:\Users\Joseph Montoya\Desktop\pruebas\redencion de facturas')
 
-df_final.to_excel(f'RM-RD {str(fecha_)[0:10]}.xlsx')
+df_final.to_excel(f'RM-RD {str(fecha_)[0:10]}.xlsx', index = False)
 
 #%%
 print('fin')

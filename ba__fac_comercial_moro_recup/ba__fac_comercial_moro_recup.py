@@ -21,7 +21,7 @@ import io
 from pyathena import connect
 
 #%% mes para insertar
-codmes = '2026-01-31'
+codmes = '2026-02-28'
 
 #%% Credenciales de AmazonAthena
 with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
@@ -50,14 +50,44 @@ athena = boto3.client(
 # nombre: Base_Morosidad_Recuperacion_Factoring.rmacuri
 named_query_id = "51eb3903-f7b6-4b2c-a527-c35765e74134"
 
-# Obtener SQL
-response = athena.get_named_query(NamedQueryId=named_query_id)
-query_sql = response["NamedQuery"]["QueryString"]
-cursor = conn.cursor()
-cursor.execute(query_sql)
+# # Obtener SQL
+# response = athena.get_named_query(NamedQueryId=named_query_id)
+# query_sql = response["NamedQuery"]["QueryString"]
+# cursor = conn.cursor()
+# cursor.execute(query_sql)
 
-df = pd.DataFrame(cursor.fetchall(), columns=[c[0] for c in cursor.description])
+# df = pd.DataFrame(cursor.fetchall(), columns=[c[0] for c in cursor.description])
 
+max_intentos = 3
+intento = 0
+
+while intento < max_intentos:
+    try:
+        # Obtener SQL de Athena
+        response = athena.get_named_query(NamedQueryId=named_query_id)
+        query_sql = response["NamedQuery"]["QueryString"]
+
+        cursor = conn.cursor()
+        cursor.execute(query_sql)
+
+        df = pd.DataFrame(
+            cursor.fetchall(),
+            columns=[c[0] for c in cursor.description]
+        )
+
+        print("Query ejecutada correctamente")
+        break
+
+    except Exception as e:
+        intento += 1
+        print(f"Error en intento {intento}: {e}")
+
+        if intento < max_intentos:
+            print("Reintentando en 30 segundos...")
+            time.sleep(30)
+        else:
+            print("Se alcanzó el máximo de intentos.")
+            raise
 df['Periodo_Cierre'] = df['Periodo_Cierre'].astype(int)
 
 # datos que se van a insertar

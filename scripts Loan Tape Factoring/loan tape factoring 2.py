@@ -25,7 +25,7 @@ hoy_formateado = datetime.today().strftime('%Y-%m-%d')
 
 #%%
 
-cierre = 202512
+cierre = 202601
 
 ubi = rf'C:\Users\Joseph Montoya\Desktop\loans tape\{cierre}' # se creará automáticamente
 
@@ -503,13 +503,7 @@ repayments['amount'] = repayments['principal_amount'] + repayments['interest_amo
 # where a.codmes <= {cierre}
 # ORDER BY payment_date  
 
-
 # '''
-
-
-
-
-
 
 query = f''' 
 with tipo_de_cambio AS (
@@ -769,7 +763,7 @@ valores = [count_of_loans, count_unique_clients, fully_paid_loans, defaulted_loa
 #%% ecuaciones loan tape
 e1 = """.=+CONTARA('Individual Loan Checks'!A:A)-1"""
 e2 = """.=+CONTARA(UNICOS('Loans File'!B:B))-1"""
-e3 = """.=+CONTAR.SI.CONJUNTO('Loans File'!$H$2:$H$28080;"CLOSED")"""
+e3 = """.=+CONTAR.SI.CONJUNTO('Loans File'!$H$2:$H$90080;"CLOSED")"""
 e4 = """.=CONTAR.SI.CONJUNTO('Loans File'!H:H;"CURRENT";'Loans File'!AQ:AQ;">"&90)"""
 e5 = """.=+SUMA('Payments File'!E:E)"""
 e6 = """.=+SUMA('Individual Loan Checks'!D:D)"""
@@ -835,6 +829,114 @@ with pd.ExcelWriter(f"{cierre}_Loan Tape Document For Alt Lenders Factoring Mb.x
     df.to_excel(writer, sheet_name ="Loans File", index=False)
     df_pagos.to_excel(writer, sheet_name ="Payments File", index=False)
 '''
+
+#%% query para añadir la zona
+query = '''
+
+with hc as (
+select 
+    cast(ruc as bigint) as ruc,  
+    departamento, 
+    provincia, 
+    distrito 
+from prod_datalake_master.hubspot__company
+where ruc is not null
+
+), vfc as (
+
+select 
+    cast(ruc as bigint) as ruc,
+    departament,
+    province,
+    district,
+    ubigeo_inei
+from prod_datalake_analytics.view_fac_companies
+
+), departamento_complementario_de_sentinel as (
+
+SELECT
+    nro_documento,
+    periodo_rcc,
+    ubigeo,
+    departamento,
+    provincia,
+    distrito
+FROM (
+    SELECT
+        nro_documento,
+        periodo_rcc,
+        ubigeo,
+        departamento,
+        provincia,
+        distrito,
+        ROW_NUMBER() OVER (
+            PARTITION BY nro_documento
+            ORDER BY periodo_rcc DESC
+        ) AS rn
+    FROM prod_datalake_analytics.sentinel_batch
+)
+WHERE rn = 1
+and departamento is not null
+
+), codes as (     
+
+select 
+distinct code, client_ruc 
+from prod_datalake_master.ba__fac_outstanding_monthly_snapshot
+
+), unidos as (     
+
+select 
+    c.*,
+    coalesce(dcds.departamento, ubig.departamento, vfc.departament, hc.departamento) as departamento,
+    coalesce(dcds.provincia, ubig.provincia, vfc.province, hc.provincia) as provincia,
+    coalesce(dcds.distrito, ubig.distrito, vfc.district, hc.distrito) as distrito,
+    vfc.ubigeo_inei
+
+from codes as c
+left join vfc
+on vfc.ruc = cast(c.client_ruc as bigint)
+left join hc
+on hc.ruc =  cast(c.client_ruc as bigint)
+left join prod_datalake_master."transversal__ubigeos_inei_2022" as ubig
+on trim(lower(ubig.ubigeo)) = trim(lower(vfc.ubigeo_inei))
+left join departamento_complementario_de_sentinel as dcds 
+on cast(dcds.nro_documento as bigint) = cast(c.client_ruc as bigint)
+), filtro as (
+
+select 
+    *,
+    case when TRIM(lower(departamento)) = 'lima' and TRIM(lower(distrito)) in ('san isidro','la molina','santiago de surco','miraflores','san borja','barranco','cercado de lima','breña','la victoria','rimac','san luis','lima','san juan de lurigancho', 'santa anita','ate','el agustino','chaclacayo','cieneguilla','lurigancho chosica','jesus maria','lince','surquillo','pueblo libre','san miguel','magdalena del mar','los olivos','carabayllo','comas','independencia','san martin de porres','santa rosa','puente piedra','ancon','santa rosa','san juan de miraflores','villa maria del triunfo','pucusana', 'villa el salvador','chorrillos','san bartolo','punta hermosa','punta negra','santa maria', 'santa maria del mar', 'lurin', 'pachacamac') then 'LIMA METROPOLITANA'
+    when TRIM(lower(departamento)) = 'lima' and TRIM(lower(distrito)) in ('callao','bellavista','la perla','carmen de la legua','mi peru', 'ventanilla', 'la punta') then 'CALLAO'
+    WHEN TRIM(LOWER(departamento)) = 'callao' then 'CALLAO'
+    when TRIM(lower(departamento)) = 'lima' then 'LIMA PROVINCIA'
+    else departamento
+    END AS "ZONA"
+
+from unidos
+)
+select * from filtro where ZONA is not null
+
+
+'''
+cursor = conn.cursor()
+cursor.execute(query)
+
+# Obtener los resultados
+resultados = cursor.fetchall()
+
+# Obtener los nombres de las columnas
+column_names = [desc[0] for desc in cursor.description]
+
+# Convertir los resultados a un DataFrame de pandas
+df_zonas = pd.DataFrame(resultados, columns = column_names)
+df_zonas_cols = df_zonas[['code', 'ZONA']]
+df_zonas_cols = df_zonas_cols.drop_duplicates(subset = 'code', keep= 'first')
+###############################################################################
+df = df.merge(df_zonas_cols,
+              left_on = 'loan_id',
+              right_on = 'code',
+              how = 'left')
 
 #%%% copiar excel de ejemplo
 ejemplo_original = r'C:/Users/Joseph Montoya/Desktop/loans tape/ejemplo/ejemplo.xlsx'
