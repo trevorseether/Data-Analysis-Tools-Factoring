@@ -163,7 +163,7 @@ df_comprobantes['N° de doc. Cliente'] = filtrado['RUC PROVEEDOR']
 
 df_comprobantes['Nombre cliente'] = filtrado['RAZON SOCIAL']
 
-df_comprobantes['Correo cliente'] = ''
+df_comprobantes['Correo cliente'] = filtrado['CORREO']
 
 df_comprobantes['Moneda'] = filtrado['Moneda Operacion']
 
@@ -238,7 +238,7 @@ if interes_moratorio.shape[0]>0:
     df_int_mo['Tipo de doc. cliente']   = 'RUC'
     df_int_mo['N° de doc. Cliente'] = interes_moratorio['RUC PROVEEDOR']
     df_int_mo['Nombre cliente'] = interes_moratorio['RAZON SOCIAL']
-    df_int_mo['Correo cliente'] = ''
+    df_int_mo['Correo cliente'] = interes_moratorio['CORREO']
     df_int_mo['Moneda'] = interes_moratorio['Moneda Operacion']
     del df_int_mo['aux1']
     

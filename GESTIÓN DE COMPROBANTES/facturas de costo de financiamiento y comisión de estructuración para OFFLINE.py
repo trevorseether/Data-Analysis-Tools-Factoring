@@ -4,6 +4,7 @@ Created on Wed Dec 10 15:14:10 2025
 
 @author: Joseph Montoya
 """
+
 # =============================================================================
 # FACTURAS PARA OFFLINE
 # POR COSTO DE FINANCIAMIENTO Y POR COMISIÓN DE ESTRUCTURACIÓN
@@ -52,7 +53,7 @@ if fac_costo_fi.shape[0]>0:
     df_costo_fi['Tipo de doc. cliente']   = 'RUC'
     df_costo_fi['N° de doc. Cliente'] = fac_costo_fi['ruc_proveedor']
     df_costo_fi['Nombre cliente'] = fac_costo_fi['razon_social']
-    df_costo_fi['Correo cliente'] = ''
+    df_costo_fi['Correo cliente'] = fac_costo_fi['correo']
     df_costo_fi['Moneda'] = fac_costo_fi['Moneda_del_Monto_Financiado']
     del df_costo_fi['aux1']
     
@@ -103,7 +104,7 @@ if fac_costo_fi.shape[0]>0:
     df_costo_fi['Tipo de doc. cliente']   = 'RUC'
     df_costo_fi['N° de doc. Cliente'] = fac_costo_fi['ruc_proveedor']
     df_costo_fi['Nombre cliente'] = fac_costo_fi['razon_social']
-    df_costo_fi['Correo cliente'] = ''
+    df_costo_fi['Correo cliente'] = fac_costo_fi['correo']
     df_costo_fi['Moneda'] = fac_costo_fi['Moneda_del_Monto_Financiado']
     del df_costo_fi['aux1']
     
