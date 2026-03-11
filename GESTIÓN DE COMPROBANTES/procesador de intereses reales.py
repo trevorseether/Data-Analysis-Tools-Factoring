@@ -50,8 +50,6 @@ df_online = df_online[['Subasta',
                        'Costo de Financiamiento Liquidado emp(numérico)',
                        'Interés Moratorio\n15 / 03 en adelante (numérico)']]
 
-
-
 #%% limpieza numérica
 # def convertir_a_float(valor):
 #     if pd.isna(valor):
@@ -132,6 +130,7 @@ df_online = df_online[    ~pd.isna(df_online['Interés Bruto pagado a Crowd (Vic
 
 df_online.to_excel(rf'C:\Users\Joseph Montoya\Desktop\pruebas\ingresos reales {hoy_formateado}.xlsx', index = False)
 
-
+#%%
+print(f'Escritorio\pruebas\ingresos reales {hoy_formateado}.xlsx')
 
 
