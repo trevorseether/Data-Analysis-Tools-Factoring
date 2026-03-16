@@ -20,7 +20,7 @@ import io
 from pyathena import connect
 
 #%% mes a actualizar
-codmes = '2026-02-28' # formato YYYY-MM-DD
+codmes = '2026-03-31' # formato YYYY-MM-DD
 
 #%% Credenciales de AmazonAthena
 with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
