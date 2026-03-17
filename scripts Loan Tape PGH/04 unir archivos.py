@@ -351,6 +351,9 @@ individuals = individuals.merge(zonas_cols,
                                 on  = 'loan_id',
                                 how = 'left')
 
+#%% AÑADIENDO COLUMNAS EXTRAS A LOANS
+loans['ltv'] = '=(Q2/3.6)/AD2'
+
 #%%
 '''
 # Guardar en un mismo Excel con varias hojas

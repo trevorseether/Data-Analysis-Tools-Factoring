@@ -6,25 +6,26 @@ Created on Mon Nov  3 09:42:04 2025
 """
 
 import pandas as pd
-import requests
-from io import BytesIO
+# import requests
+# from io import BytesIO
 # import numpy as np
 # import boto3
 from pyathena import connect
 # import openpyxl
-from openpyxl import load_workbook
-from openpyxl.styles import NamedStyle
+# from openpyxl import load_workbook
+# from openpyxl.styles import NamedStyle
 import os
 
-import shutil
-from datetime import datetime
+# import shutil
+# from datetime import datetime
 
 import warnings
 warnings.filterwarnings("ignore")
 
 #%%
-fecha_ = pd.Timestamp('2026-02-01')
-limit_ = pd.Timestamp('2026-02-28')
+fecha_ = pd.Timestamp('2026-03-01') #yyyy-mm-dd
+limit_ = pd.Timestamp('2026-03-07')
+ubicacion = r'C:\Users\Joseph Montoya\Desktop\pruebas\redencion de facturas'
 
 #%% Credenciales de AmazonAthena
 import json
@@ -371,7 +372,7 @@ del df_final['_t']
 df_final = df_final.reset_index(drop=True)
 
 #%%
-os.chdir(r'C:\Users\Joseph Montoya\Desktop\pruebas\redencion de facturas')
+os.chdir(ubicacion)
 
 df_final.to_excel(f'RM-RD {str(fecha_)[0:10]}.xlsx', index = False)
 

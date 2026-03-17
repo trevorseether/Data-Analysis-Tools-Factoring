@@ -25,6 +25,10 @@ df_offline = pd.read_excel( archivo,
 # filtrando orderings
 df_offline = df_offline[df_offline['tipo_de_producto'] == 'Ordering']
 
+#%% operaciones que hay que omitir para evitar doble facturación (aquellos que ya tienen)
+
+df_offline = df_offline[df_offline['Comprobante_costo_financiamiento_manual (en caso de ordering, automatizado)'].isna()]
+
 #%% FACTURAS POR COSTO DE FINANCIAMIENTO
 
 fac_costo_fi = df_offline[~pd.isna(df_offline['Costo_Financiamiento_teorico'])]
