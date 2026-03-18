@@ -342,6 +342,7 @@ zonas = pd.DataFrame(resultados, columns = column_names)
 zonas = zonas[zonas['loan_id'].notna()]
 zonas_cols = zonas[['loan_id', 'ZONA']]
 zonas_cols = zonas_cols.drop_duplicates(subset = 'loan_id', keep = 'first')
+
 #%% UNION
 loans = loans.merge(zonas_cols,
                     on  = 'loan_id',
@@ -353,6 +354,10 @@ individuals = individuals.merge(zonas_cols,
 
 #%% AÑADIENDO COLUMNAS EXTRAS A LOANS
 loans['ltv'] = '=(Q2/3.6)/AD2'
+
+# añadiendo recuperaciones
+fechas_castigo = pd.read_excel('G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/Reportes/salidas/castigos automatizados.xlsx.xlsx')
+
 
 #%%
 '''

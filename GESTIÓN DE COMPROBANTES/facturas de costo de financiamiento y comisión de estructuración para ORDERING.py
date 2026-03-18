@@ -13,6 +13,7 @@ Created on Wed Dec  3 17:50:09 2025
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from pyathena import connect
 
 #%% lectura de hoja de opps offline
 archivo = 'G:/Mi unidad/Pagados 122024 en adelante.xlsx'
@@ -28,6 +29,36 @@ df_offline = df_offline[df_offline['tipo_de_producto'] == 'Ordering']
 #%% operaciones que hay que omitir para evitar doble facturación (aquellos que ya tienen)
 
 df_offline = df_offline[df_offline['Comprobante_costo_financiamiento_manual (en caso de ordering, automatizado)'].isna()]
+
+#%% Conexión a Amazon Athena
+import json
+with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
+    creds = json.load(f)
+
+conn = connect(
+    aws_access_key_id     = creds["AccessKeyId"],
+    aws_secret_access_key = creds["SecretAccessKey"],
+    aws_session_token     = creds["SessionToken"],
+    s3_staging_dir        = creds["s3_staging_dir"],
+    region_name           = creds["region_name"]
+    )
+
+# obtención del tipo de cambio y fecha de emision
+query = """
+select * from prod_datalake_master.prestamype__tc_contable
+order by pk desc
+limit 1
+"""
+cursor = conn.cursor()
+cursor.execute(query)
+# Obtener los resultados
+resultados = cursor.fetchall()
+# Obtener los nombres de las columnas
+column_names = [desc[0] for desc in cursor.description]
+# Convertir los resultados a un DataFrame de pandas
+tc = pd.DataFrame(resultados, columns = column_names)
+tc_contable = tc['tc_contable'].max()
+fecha_emision = pd.to_datetime(tc['pk'].max())
 
 #%% FACTURAS POR COSTO DE FINANCIAMIENTO
 
@@ -51,7 +82,8 @@ if fac_costo_fi.shape[0]>0:
     df_costo_fi['Grupo'] = np.arange(1, len(df_costo_fi) + 1)
     df_costo_fi['Serie'] = 'F003'
     df_costo_fi['Correlativo'] = ''    
-    df_costo_fi['Fecha de emisión'] = pd.to_datetime(datetime.now()).normalize()
+    # df_costo_fi['Fecha de emisión'] = pd.to_datetime(datetime.now()).normalize()
+    df_costo_fi['Fecha de emisión'] = fecha_emision.normalize()
     df_costo_fi['Fecha de emisión'] = (df_costo_fi['Fecha de emisión'].dt.strftime("%Y-%m-%d").astype("string"))
     df_costo_fi['Tipo de doc. cliente']   = 'RUC'
     df_costo_fi['N° de doc. Cliente'] = fac_costo_fi['ruc_proveedor']
@@ -75,9 +107,57 @@ if fac_costo_fi.shape[0]>0:
 
 hoy_formateado = datetime.today().strftime('%d-%m-%Y')
 
-with pd.ExcelWriter(ubi + f'\\Carga_masiva_Facturas_costo_financiamiento_ORDERING {hoy_formateado}.xlsx', engine='xlsxwriter') as writer:
-    df_costo_fi.to_excel(writer, index=False, sheet_name='Comprobantes')
-    df_costo_items.to_excel(writer, index=False, sheet_name='Items')
+###############################################################################
+# obteniendo el precio solarizado, para filtrar aquellos que deben ir en detracciones
+df_costo_items['tc'] = tc_contable
+df_costo_items = df_costo_items.merge(df_costo_fi[['Grupo', 'Moneda']], on = 'Grupo', how = 'left')
+df_costo_items['monto solarizado aux'] = np.where(df_costo_items['Moneda'] == 'USD',
+                                                  df_costo_items['Precio del item'] * tc_contable,
+                                                  df_costo_items['Precio del item'])
+df_costo_items['filtro detracciones'] = np.where(df_costo_items['monto solarizado aux'] >= 700,
+                                                 'aplica detracciones',
+                                                 '')
+df_costo_fi = df_costo_fi.merge(df_costo_items[['Grupo', 'filtro detracciones']], on = 'Grupo', how = 'left')
+
+df_cfi_detracciones = df_costo_fi[df_costo_fi['filtro detracciones'] =='aplica detracciones']
+df_cit_detracciones = df_costo_items[df_costo_items['filtro detracciones'] =='aplica detracciones']
+
+df_cfi_nd = df_costo_fi[df_costo_fi['filtro detracciones'] !='aplica detracciones']
+df_cit_nd = df_costo_items[df_costo_items['filtro detracciones'] !='aplica detracciones']
+###############################################################################
+del df_cit_nd['tc']
+del df_cit_nd['Moneda']
+del df_cit_nd['monto solarizado aux']
+del df_cit_nd['filtro detracciones']
+
+del df_cfi_nd['filtro detracciones']
+
+df_cfi_nd['Grupo'] = np.arange(1, len(df_cfi_nd) + 1)
+df_cit_nd['Grupo'] = np.arange(1, len(df_cfi_nd) + 1)
+
+with pd.ExcelWriter(ubi + f'\\Carga_masiva_Facturas_costo_financiamiento_ORDERING_sin_detraccion {str(fecha_emision)[0:10]}.xlsx', engine='xlsxwriter') as writer:
+    df_cfi_nd.to_excel(writer, index=False, sheet_name='Comprobantes')
+    df_cit_nd.to_excel(writer, index=False, sheet_name='Items')
+
+###############################################################################
+df_cfi_detracciones['Tipo de detracción'] = '037 - Demás servicios gravados con el IGV'
+df_cfi_detracciones['Medio de pago'] = '001 - Depósito en cuenta'
+
+df_cfi_detracciones = df_cfi_detracciones[['Grupo', 'Serie', 'Correlativo', 'Fecha de emisión',
+                                           'Tipo de detracción', 'Medio de pago',
+                                           'Tipo de doc. cliente', 'N° de doc. Cliente', 'Nombre cliente',
+                                           'Correo cliente', 'Moneda']]
+del df_cit_detracciones['tc']
+del df_cit_detracciones['Moneda']
+del df_cit_detracciones['monto solarizado aux']
+del df_cit_detracciones['filtro detracciones']
+
+df_cfi_detracciones['Grupo'] = np.arange(1, len(df_cfi_detracciones) + 1)
+df_cit_detracciones['Grupo'] = np.arange(1, len(df_cit_detracciones) + 1)
+
+with pd.ExcelWriter(ubi + f'\\Carga_masiva_Facturas_costo_financiamiento_ORDERING_con_detraccion {str(fecha_emision)[0:10]}.xlsx', engine='xlsxwriter') as writer:
+    df_cfi_detracciones.to_excel(writer, index=False, sheet_name='Comprobantes')
+    df_cit_detracciones.to_excel(writer, index=False, sheet_name='Items')
 
 #%% FACTURAS POR COMISIÓN DE ESTRUCTURACIÓN
 COLUMNA_COMISION = 'comision_estructuracion (para todas las ops mixtas esta columna corresponde a la nota de crédito o débito)'
@@ -102,7 +182,8 @@ if fac_costo_fi.shape[0]>0:
     df_costo_fi['Grupo'] = np.arange(1, len(df_costo_fi) + 1)
     df_costo_fi['Serie'] = 'F003'
     df_costo_fi['Correlativo'] = ''    
-    df_costo_fi['Fecha de emisión'] = pd.to_datetime(datetime.now()).normalize()
+    # df_costo_fi['Fecha de emisión'] = pd.to_datetime(datetime.now()).normalize()
+    df_costo_fi['Fecha de emisión'] = fecha_emision.normalize()
     df_costo_fi['Fecha de emisión'] = (df_costo_fi['Fecha de emisión'].dt.strftime("%Y-%m-%d").astype("string"))
     df_costo_fi['Tipo de doc. cliente']   = 'RUC'
     df_costo_fi['N° de doc. Cliente'] = fac_costo_fi['ruc_proveedor']
@@ -126,14 +207,57 @@ if fac_costo_fi.shape[0]>0:
 
 hoy_formateado = datetime.today().strftime('%d-%m-%Y')
 
-with pd.ExcelWriter(ubi + f'\\Carga_masiva_Facturas_comision_estructuracion_ORDERING {hoy_formateado}.xlsx', engine='xlsxwriter') as writer:
-    df_costo_fi.to_excel(writer, index=False, sheet_name='Comprobantes')
-    df_costo_items.to_excel(writer, index=False, sheet_name='Items')
+###############################################################################
+# obteniendo el precio solarizado, para filtrar aquellos que deben ir en detracciones
+df_costo_items['tc'] = tc_contable
+df_costo_items = df_costo_items.merge(df_costo_fi[['Grupo', 'Moneda']], on = 'Grupo', how = 'left')
+df_costo_items['monto solarizado aux'] = np.where(df_costo_items['Moneda'] == 'USD',
+                                                  df_costo_items['Precio del item'] * tc_contable,
+                                                  df_costo_items['Precio del item'])
+df_costo_items['filtro detracciones'] = np.where(df_costo_items['monto solarizado aux'] >= 700,
+                                                 'aplica detracciones',
+                                                 '')
+df_costo_fi = df_costo_fi.merge(df_costo_items[['Grupo', 'filtro detracciones']], on = 'Grupo', how = 'left')
 
+df_cfi_detracciones = df_costo_fi[df_costo_fi['filtro detracciones'] =='aplica detracciones']
+df_cit_detracciones = df_costo_items[df_costo_items['filtro detracciones'] =='aplica detracciones']
 
+df_cfi_nd = df_costo_fi[df_costo_fi['filtro detracciones'] !='aplica detracciones']
+df_cit_nd = df_costo_items[df_costo_items['filtro detracciones'] !='aplica detracciones']
+###############################################################################
+del df_cit_nd['tc']
+del df_cit_nd['Moneda']
+del df_cit_nd['monto solarizado aux']
+del df_cit_nd['filtro detracciones']
 
+del df_cfi_nd['filtro detracciones']
 
+df_cfi_nd['Grupo'] = np.arange(1, len(df_cfi_nd) + 1)
+df_cit_nd['Grupo'] = np.arange(1, len(df_cfi_nd) + 1)
 
+with pd.ExcelWriter(ubi + f'\\Carga_masiva_Facturas_comision_estructuracion_ORDERING_sin_detraccion {str(fecha_emision)[0:10]}.xlsx', engine='xlsxwriter') as writer:
+    df_cfi_nd.to_excel(writer, index=False, sheet_name='Comprobantes')
+    df_cit_nd.to_excel(writer, index=False, sheet_name='Items')
 
+###############################################################################
+df_cfi_detracciones['Tipo de detracción'] = '037 - Demás servicios gravados con el IGV'
+df_cfi_detracciones['Medio de pago'] = '001 - Depósito en cuenta'
 
+df_cfi_detracciones = df_cfi_detracciones[['Grupo', 'Serie', 'Correlativo', 'Fecha de emisión',
+                                           'Tipo de detracción', 'Medio de pago',
+                                           'Tipo de doc. cliente', 'N° de doc. Cliente', 'Nombre cliente',
+                                           'Correo cliente', 'Moneda']]
+del df_cit_detracciones['tc']
+del df_cit_detracciones['Moneda']
+del df_cit_detracciones['monto solarizado aux']
+del df_cit_detracciones['filtro detracciones']
+
+df_cfi_detracciones['Grupo'] = np.arange(1, len(df_cfi_detracciones) + 1)
+df_cit_detracciones['Grupo'] = np.arange(1, len(df_cit_detracciones) + 1)
+with pd.ExcelWriter(ubi + f'\\Carga_masiva_Facturas_comision_estructuracion_ORDERING_con_detraccion {str(fecha_emision)[0:10]}.xlsx', engine='xlsxwriter') as writer:
+    df_cfi_detracciones.to_excel(writer, index=False, sheet_name='Comprobantes')
+    df_cit_detracciones.to_excel(writer, index=False, sheet_name='Items')
+
+#%%
+print('fin')
 
