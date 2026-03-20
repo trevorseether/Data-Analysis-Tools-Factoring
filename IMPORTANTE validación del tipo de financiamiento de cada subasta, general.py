@@ -41,8 +41,9 @@ SELECT
     , a.proforma_simulation_currency
     , a.proforma_client_payment_date_expected
     , CASE
-        WHEN c.customer_email LIKE 'gestora@prestamype.com' then 'GESTORA'
-        WHEN c.customer_email LIKE 'factoringfinanzas@prestamype.com' then 'ONBALANCE'
+        WHEN c.customer_email = 'gestora@prestamype.com' then 'GESTORA'
+        WHEN c.customer_email = 'factoringfinanzas@prestamype.com' then 'ONBALANCE'
+        WHEN c.customer_email = 'finanzas.factoring@prestamype.com' then 'ONBALANCE'
         ELSE 'CROWD'
         END "TIPO"
         

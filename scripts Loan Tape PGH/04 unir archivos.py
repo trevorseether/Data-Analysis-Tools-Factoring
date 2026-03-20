@@ -356,7 +356,25 @@ individuals = individuals.merge(zonas_cols,
 loans['ltv'] = '=(Q2/3.6)/AD2'
 
 # añadiendo recuperaciones
-fechas_castigo = pd.read_excel('G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/Reportes/salidas/castigos automatizados.xlsx.xlsx')
+fechas_castigo = pd.read_excel('G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/Reportes/salidas/castigos automatizados.xlsx')
+
+query = '''
+select 
+    last_day_of_month(date_parse(cast(cierre as varchar), '%Y%m')) as fecha_cierre
+    ,* 
+from  prod_datalake_master.ba__data_portafolio_pgh
+
+'''
+cursor = conn.cursor()
+cursor.execute(query)
+# Obtener los resultados
+resultados = cursor.fetchall()
+# Obtener los nombres de las columnas
+column_names = [desc[0] for desc in cursor.description]
+# Convertir los resultados a un DataFrame de pandas
+portafolio = pd.DataFrame(resultados, columns = column_names)
+
+cods = portafolio[['loan_id','contract_id']].drop_duplicates(inplace = True)
 
 
 #%%
