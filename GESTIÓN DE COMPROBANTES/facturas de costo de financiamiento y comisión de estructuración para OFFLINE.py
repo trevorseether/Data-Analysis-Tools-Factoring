@@ -112,7 +112,7 @@ if fac_costo_fi.shape[0]>0:
     del df_costo_fi['aux1']
     
     df_costo_items = pd.DataFrame()
-    df_costo_items['aux1'] = fac_costo_fi['Codigo_de_Subasta']
+    df_costo_items['aux1'] = fac_costo_fi['Codigo_de_Subasta'] + " - CE"
     df_costo_items['Grupo'] = np.arange(1, len(df_costo_items) + 1)
     df_costo_items['Código del item'] = fac_costo_fi['Codigo_de_Subasta']
     df_costo_items['Descripción del item'] = 'Comisión de estructuración por operación de factoring.'

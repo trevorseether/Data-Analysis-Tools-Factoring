@@ -25,7 +25,7 @@ hoy_formateado = datetime.today().strftime('%Y-%m-%d')
 
 #%%
 
-cierre = 202601
+cierre = 202602
 
 ubi = rf'C:\Users\Joseph Montoya\Desktop\loans tape\{cierre}' # se creará automáticamente
 
@@ -103,7 +103,7 @@ WITH ranked_rows AS (
     left join prod_datalake_analytics.tipo_cambio_jmontoya as tcjm 
     on ce.yyyymm = tcjm.tc_codmes
 
-)
+), tabla_final as (
 
 SELECT a.code as loan_id,
 	a.client_ruc as customer_id,
@@ -140,7 +140,13 @@ SELECT a.code as loan_id,
 	'=+AT2' as "Monto Factura",
 	'=+S2'  as "Monto Financiado",
 	'=X2*((1+V2)^(P2/30)-1)' as "Intereses",
-	(CASE WHEN (g.product = 'factoring') THEN g.proforma_simulation_financing_advance ELSE g.invoice_net_amount END) as "Monto Adelantado",
+	(CASE 
+	WHEN (g.product = 'factoring') and (g.currency = 'PEN') THEN g.proforma_simulation_financing_advance
+	WHEN (g.product = 'factoring') and (g.currency = 'USD') THEN g.proforma_simulation_financing_advance * a.exchange_rate
+	WHEN (g.product != 'factoring') and (g.currency = 'PEN') THEN g.invoice_net_amount
+	WHEN (g.product != 'factoring') and (g.currency = 'USD') THEN g.invoice_net_amount * a.exchange_rate
+	END) as "Monto Adelantado",
+	
 	'=X2-Z2' AS "FEE Estructutación",
 	'.=SI(J2="confirming";0;T2-Z2-AA2-Y2)' as "GARANTIA",
 	'=Y2' AS "Interes o Cost Financiamiento",
@@ -201,6 +207,8 @@ SELECT a.code as loan_id,
 		AND currency_auctions = 'PEN' THEN proforma_start_simulation_financing_cost_value
 		WHEN currency_auctions = 'USD' THEN proforma_start_simulation_financing_cost_value * a.exchange_rate ELSE proforma_end_simulation_financing_cost_value
 	END AS interest_amount -- para hoja Repayment Schedules File
+	,tc.exchange_rate
+	,a.exchange_rate
 FROM ranked_rows a
 	LEFT JOIN (
 		SELECT code,
@@ -216,6 +224,10 @@ FROM ranked_rows a
 	LEFT JOIN prod_datalake_analytics.fac_requests g ON a.code = g.code
 	
 	LEFT JOIN comision_exito_sol as ce on ce.code = c.code
+	
+	LEFT JOIN prod_datalake_analytics.tipo_cambio_jmontoya as tc
+	on date_format(cast(tc.mes_tc as date), '%Y%m') = date_format(cast(a.transfer_date as date), '%Y%m')
+	
 WHERE rn = 1 --limit 10 16,557
 	AND (
 		(
@@ -228,7 +240,9 @@ WHERE rn = 1 --limit 10 16,557
 		)
 	)
     -- and a.code = '8GA97sqH'
-ORDER BY a.codmes;
+ORDER BY a.codmes
+
+)select * from tabla_final
 
 
 '''
@@ -934,9 +948,11 @@ df_zonas_cols = df_zonas[['code', 'ZONA']]
 df_zonas_cols = df_zonas_cols.drop_duplicates(subset = 'code', keep= 'first')
 ###############################################################################
 df = df.merge(df_zonas_cols,
-              left_on = 'loan_id',
+              left_on  = 'loan_id',
               right_on = 'code',
-              how = 'left')
+              how      = 'left')
+
+del df['code']
 
 #%%% copiar excel de ejemplo
 ejemplo_original = r'C:/Users/Joseph Montoya/Desktop/loans tape/ejemplo/ejemplo.xlsx'
@@ -960,7 +976,6 @@ if crear_excel == True:
         df_pagos.to_excel(writer,   sheet_name="Payments File",            index =False)
         repayments.to_excel(writer, sheet_name="Repayment Schedules File", index =False)
         aggregate_checks.to_excel(writer,sheet_name="agg checks",          index =False)
-
 
 #%% Carga al lake
 if upload_s3 == True:

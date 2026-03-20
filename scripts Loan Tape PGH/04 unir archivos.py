@@ -19,7 +19,7 @@ today_date = datetime.now(peru_tz).strftime('%Y%m%d')
 #%%
 crear_excel = True # crear excel, True o False
 cargar_lake = True # cargar al lake, True o False
-cierre = '202601'
+cierre = '202602'
 os.chdir(rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} existing')
 
 path_new      = rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} news'
@@ -361,6 +361,7 @@ fechas_castigo = pd.read_excel('G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxj
 query = '''
 select 
     last_day_of_month(date_parse(cast(cierre as varchar), '%Y%m')) as fecha_cierre
+    ,case when diasatraso > 0 then capital_soles else 0 end as par1_soles
     ,* 
 from  prod_datalake_master.ba__data_portafolio_pgh
 
@@ -373,9 +374,35 @@ resultados = cursor.fetchall()
 column_names = [desc[0] for desc in cursor.description]
 # Convertir los resultados a un DataFrame de pandas
 portafolio = pd.DataFrame(resultados, columns = column_names)
+portafolio['begin_date'] = pd.to_datetime(portafolio['begin_date'])
+portafolio['mes_desembolso'] = portafolio['begin_date'] + pd.offsets.MonthEnd(0)
 
-cods = portafolio[['loan_id','contract_id']].drop_duplicates(inplace = True)
+cods = portafolio[['loan_id','contract_id']].drop_duplicates(subset = 'loan_id', keep = 'first')
 
+fecha_inf = '2021-01-01'
+fecha_sup = '2025-12-31'
+
+desembolsos = portafolio[['mes_desembolso']]
+desembolsos = desembolsos[(desembolsos['mes_desembolso'] >= pd.Timestamp(fecha_inf)) & (desembolsos['mes_desembolso'] <= pd.Timestamp(fecha_sup))]
+desembolsos = desembolsos.drop_duplicates(subset = 'mes_desembolso', keep = 'first')
+desembolsos = desembolsos.sort_values(by='mes_desembolso').reset_index(drop=True)
+m_desembolsado = portafolio[portafolio['q_desembolsado'] == 1]
+m_desembolsado = m_desembolsado.pivot_table(index   = 'mes_desembolso',
+                                            values  = 'loan_amount_soles',
+                                            aggfunc = 'sum').reset_index()
+desembolsos = desembolsos.merge(m_desembolsado,
+                                on  = 'mes_desembolso',
+                                how = 'left')
+
+portafolio = portafolio[(portafolio['mes_desembolso'] >= pd.Timestamp(fecha_inf)) & (portafolio['status'] == 'VIGENTE')]
+pivot_cosecha = portafolio.pivot_table(index   = 'mes_desembolso',
+                                       columns = 'cierre',
+                                       values  = 'capital_30d',
+                                       aggfunc = 'sum').reset_index()
+
+desembolsos = desembolsos.merge(pivot_cosecha,
+                                on  = 'mes_desembolso',
+                                how = 'left')
 
 #%%
 '''
@@ -409,6 +436,7 @@ if crear_excel == True:
         repayments.to_excel(writer,  sheet_name="Repayment Schedules File", index = False)
         payments.to_excel(writer,    sheet_name="Payments File",            index = False)
         aggregate_checks.to_excel(writer, sheet_name="agg checks",          index = False)
+        desembolsos.to_excel(writer, sheet_name="Vintage Default",          index = False)
     print('excel creado')
 
 #%%
