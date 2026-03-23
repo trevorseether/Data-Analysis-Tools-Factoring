@@ -1,0 +1,280 @@
+with
+  cortes_mensuales AS (
+   SELECT DATE_ADD('day', -1, DATE_TRUNC('month', DATE_ADD('month', (x + 1), DATE '2017-03-31'))) fecha_eomonth
+   FROM
+     UNNEST(SEQUENCE(0, 120)) t (x)
+   WHERE (DATE_ADD('day', -1, DATE_TRUNC('month', DATE_ADD('month', (x + 1), DATE '2017-03-31'))) <= DATE_ADD('day', -1, DATE_TRUNC('month', DATE_ADD('month', 1, current_date))))
+
+), finalizados as (
+
+    select
+  "codigo_de_cuota" ,
+  "codigo_operacion", 
+  "codigo_contrato" ,
+  "codigo_empresario", 
+  "empresario" ,
+  "codigo_inversionista", 
+  "inversionista" ,
+  "tipo_de_prestamo" ,
+  "situacion_del_credito", 
+  "distrito" ,
+  "cuota_esperada_mensual",
+  "nro_cuotas" ,
+  "fecha_de_pago_esperada_original", 
+  "saldo_por_cancelar" ,
+  "interes_esperado_fraccionado_original", 
+  "amortizacion_esperada_fraccionado_original", 
+  "interes_esperado_original" ,
+  "amortizacion_esperada_original" ,
+  "igv_esperada_original" ,
+  "cuota_esperada_actualizada" ,
+  "saldo_por_cancelar_esperado_actualizada" ,
+  "capital_fraccionado_actualizado" ,
+  "interes_fraccionado_actualizado" ,
+  "interes_esperado_actualizado" ,
+  "amortizacion_esperada_actualizado" ,
+  "igv_esperada_actualizado" ,
+  "fecha_de_pago_del_cliente" ,
+  "monto_total_pagado_al_credito" ,
+  "capital_fraccionado_pagado" ,
+  "interes_fraccionado_pagado" ,
+  "capital_pagado" ,
+  "interes_pagado" ,
+  "igv_pagado" ,
+  "descuento_de_interes" ,
+  "descuento_de_capital" ,
+  "monto_ampliado_renovado_o_sustituido" ,
+  "penalidades" ,
+  "saldo_a_favor" ,
+  "dias_de_atraso_de_pago" ,
+  "status" ,
+  "dias_de_adelanto_de_pago" ,
+  "seguimiento_de_pagos" ,
+  "condicion_actual_del_credito" ,
+  "detalle_de_condicion" ,
+  "condicion_asignada" ,
+  "causal_de_cancelacion" ,
+  "medio_de_cancelacion" ,
+  "puntualidad" ,
+  "moneda" ,
+  "fondo" ,
+  "estado_de_prestamo"
+  
+    from prod_datalake_master.bd_pagos__bd_pagos_finalizados
+
+), vigentes as (       
+
+    select   
+  v."codigo_de_cuota" ,
+  v."codigo_operacion", 
+  v."codigo_contrato" ,
+  v."codigo_empresario", 
+  v."empresario" ,
+  v."codigo_inversionista", 
+  v."inversionista" ,
+  v."tipo_de_prestamo" ,
+  v."situacion_del_credito", 
+  v."distrito" ,
+  v."cuota_esperada_mensual",
+  v."nro_cuotas" ,
+  v."fecha_de_pago_esperada_original", 
+  v."saldo_por_cancelar" ,
+  v."interes_esperado_fraccionado_original", 
+  v."amortizacion_esperada_fraccionado_original", 
+  v."interes_esperado_original" ,
+  v."amortizacion_esperada_original" ,
+  v."igv_esperada_original" ,
+  v."cuota_esperada_actualizada" ,
+  v."saldo_por_cancelar_esperado_actualizada" ,
+  v."capital_fraccionado_actualizado" ,
+  v."interes_fraccionado_actualizado" ,
+  v."interes_esperado_actualizado" ,
+  v."amortizacion_esperada_actualizado" ,
+  v."igv_esperada_actualizado" ,
+  v."fecha_de_pago_del_cliente" ,
+  v."monto_total_pagado_al_credito" ,
+  v."capital_fraccionado_pagado" ,
+  v."interes_fraccionado_pagado" ,
+  v."capital_pagado" ,
+  v."interes_pagado" ,
+  v."igv_pagado" ,
+  v."descuento_de_interes" ,
+  v."descuento_de_capital" ,
+  v."monto_ampliado_renovado_o_sustituido" ,
+  v."penalidades" ,
+  v."saldo_a_favor" ,
+  v."dias_de_atraso_de_pago" ,
+  v."status" ,
+  v."dias_de_adelanto_de_pago" ,
+  v."seguimiento_de_pagos" ,
+  v."condicion_actual_del_credito" ,
+  v."detalle_de_condicion" ,
+  v."condicion_asignada" ,
+  v."causal_de_cancelacion" ,
+  v."medio_de_cancelacion" ,
+  v."puntualidad" ,
+  v."moneda" ,
+  v."fondo" ,
+  v."estado_de_prestamo"
+  from prod_datalake_master.bd_pagos__bd_pagos as v
+  left join (select "codigo_operacion" from finalizados) as f
+  on v."codigo_operacion" = f."codigo_operacion"
+  where f."codigo_operacion" is null
+
+), pagos_unidos as (       
+select 
+    *
+from vigentes as v
+    union all       
+select * from finalizados as f
+    
+), pagos_cols as (
+
+select 
+pu."codigo_operacion" as a,
+pu."codigo_contrato" as b, 
+pu."cuota_esperada_mensual" as c,
+pu."fecha_de_pago_esperada_original" as d,
+pu."saldo_por_cancelar" as e,
+pu."interes_esperado_original" as f,
+pu."amortizacion_esperada_original" as g,
+pu."saldo_por_cancelar_esperado_actualizada" as h,
+pu."fecha_de_pago_del_cliente" as i,
+pu."monto_total_pagado_al_credito" as j,
+pu."capital_pagado" as k,
+pu."interes_pagado" as l,
+pu."dias_de_atraso_de_pago" as m,
+pu."condicion_actual_del_credito" as n,
+pu."estado_de_prestamo" as o,
+pu."moneda" as p,
+
+case when pu."moneda" = 'SOLES' THEN pu."saldo_por_cancelar" 
+ELSE pu."saldo_por_cancelar"*tc.exchange_rate END AS "saldo_por_cancelar_soles",
+
+case when pu."moneda" = 'SOLES' THEN pu."saldo_por_cancelar_esperado_actualizada" 
+ELSE pu."saldo_por_cancelar_esperado_actualizada"*tc.exchange_rate END AS "saldo_por_cancelar_esperado_actualizada_soles",
+
+case when pu."moneda" = 'SOLES' THEN pu."monto_total_pagado_al_credito" 
+ELSE pu."monto_total_pagado_al_credito"*tc.exchange_rate END AS "monto_total_pagado_al_credito_soles",
+
+case when pu."moneda" = 'SOLES' THEN pu."capital_pagado"
+ELSE pu."capital_pagado"*tc.exchange_rate END AS "capital_pagado_soles",
+
+case when pu."moneda" = 'SOLES' THEN pu."interes_pagado"
+ELSE pu."interes_pagado"*tc.exchange_rate END AS "interes_pagado_soles",
+
+date_add('day',-1,date_trunc('month', date_add('month', 1, pu."fecha_de_pago_del_cliente"))) as mes_pago,
+cast(date_format(pu."fecha_de_pago_del_cliente", '%Y%m') as int) as codmes_pago,
+tc.exchange_rate as exchange_rate_realized_payment,
+tc2.exchange_rate as exchange_rate_proforma_payment,
+pu.* 
+from pagos_unidos as pu 
+
+left join prod_datalake_analytics.tipo_cambio_jmontoya as tc
+on cast(tc.tc_codmes as int) = cast(date_format(pu."fecha_de_pago_del_cliente", '%Y%m') as int)
+
+left join prod_datalake_analytics.tipo_cambio_jmontoya as tc2
+on cast(tc2.tc_codmes as int) = cast(date_format(pu."fecha_de_pago_esperada_original", '%Y%m') as int)
+
+
+), fecha_finalizacion as (
+
+SELECT
+    codigo_operacion as "codigo_prestamo",
+    max(fecha_de_pago_del_cliente) as "fecha_finalizacion",
+    date_add('day',-1,date_trunc('month', date_add('month', 1, max(fecha_de_pago_del_cliente))) ) as "mes_finalizacion"
+    
+FROM pagos_unidos
+GROUP BY codigo_operacion
+HAVING
+    SUM(CASE WHEN estado_de_prestamo is null or estado_de_prestamo <> 'FINALIZADO' THEN 1 ELSE 0 END) = 0
+
+), base_operaciones as (                          
+select 
+
+    oo."total_colocado" as monto_financiado,
+    date_add('day',-1,date_trunc('month', date_add('month', 1, oo."fecha_desembolso"))) as mes_desembolso,
+    oo.*,
+    ff."fecha_finalizacion",
+    ff."mes_finalizacion"
+
+from prod_datalake_master.bd_operaciones__operaciones as oo
+left join fecha_finalizacion  as ff
+on oo.codigo_prestamo = ff.codigo_prestamo
+
+where oo."total_colocado" is not null
+
+), portafolio as (     
+
+select
+    cm.fecha_eomonth,
+    cast(date_format(cm.fecha_eomonth, '%Y%m') as int) as codmes,
+    tc.exchange_rate,
+    bo.*
+
+from cortes_mensuales as cm
+left join base_operaciones as bo on true
+left join prod_datalake_analytics.tipo_cambio_jmontoya as tc
+on cast(tc.tc_codmes as int) = cast(date_format(cm.fecha_eomonth, '%Y%m') as int)
+
+where (bo.mes_desembolso <= cm.fecha_eomonth) and (cm.fecha_eomonth <= coalesce(bo.mes_finalizacion, date '2099-01-01'))
+
+), portafolio_de_pagos_1 as (
+
+SELECT
+    cm.fecha_eomonth,
+    cast(date_format(cm.fecha_eomonth, '%Y%m') as int) as codmes,
+    pu.*
+
+from cortes_mensuales as cm
+left join pagos_cols as pu on true
+where (pu."fecha_de_pago_del_cliente" <= cm.fecha_eomonth)
+
+), portafolio_de_pagos_2 as ( 
+
+select
+    fecha_eomonth,
+    codigo_operacion,
+    round(coalesce(sum(capital_pagado), 0), 2) as capital_pagado,
+    round(coalesce(sum(capital_pagado_soles), 0), 2) as capital_pagado_soles,
+    round(coalesce(sum(interes_pagado), 0), 2) as interes_pagado,
+    round(coalesce(sum(interes_pagado_soles), 0), 2) as interes_pagado_soles,
+    round(coalesce(max_by(saldo_por_cancelar, fecha_de_pago_del_cliente), 0), 2) as saldo_por_cancelar,
+    round(coalesce(max_by(saldo_por_cancelar_soles, fecha_de_pago_del_cliente), 0), 2) as saldo_por_cancelar_soles
+    
+from portafolio_de_pagos_1
+group by codigo_operacion, fecha_eomonth
+
+), portafolio_final as (
+
+select
+    p.*,
+    pp2.*,
+    case when mes_finalizacion = fecha_desembolso then 'finalizado' else 'vigente' end as "actual_status",
+    greatest(p.monto_financiado - coalesce(pp2.capital_pagado,0) , 0)as "saldo_capital",
+    case 
+    when moneda = 'SOLES' then greatest(p.monto_financiado - coalesce(pp2.capital_pagado,0) , 0)
+    else  greatest(p.monto_financiado* exchange_rate - pp2.capital_pagado* exchange_rate , 0)
+    end as "saldo_capital_soles"
+    
+from portafolio as p
+left join portafolio_de_pagos_2 as pp2
+on (p.fecha_eomonth = pp2.fecha_eomonth) and (pp2.codigo_operacion = p.codigo_prestamo) 
+
+) 
+/*
+select 
+    codmes, 
+    cast(sum("saldo_capital_soles") as decimal(38,2)), 
+    cast(sum(saldo_por_cancelar_soles) as decimal(38,2))
+from portafolio_final group by codmes
+order by codmes desc
+*/
+
+
+select * from portafolio_final
+
+
+
+-- select * from base_operaciones
+-- where codigo_prestamo = 'P04766E03341Y00511RYAP2P'

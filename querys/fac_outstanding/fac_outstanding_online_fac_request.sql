@@ -54,7 +54,7 @@ WITH
    , (CASE WHEN (b.product = 'factoring') THEN b.user_third_party_ruc ELSE b.company_ruc END) client_ruc
    , (CASE WHEN (b.product = 'confirming') THEN b.user_third_party_name ELSE b.company_name END) provider_name
    , (CASE WHEN (b.product = 'confirming') THEN b.user_third_party_ruc ELSE b.company_ruc END) provider_ruc
-   , COALESCE(DATE_ADD('hour', -5, b.interest_proforma_disbursement_date), c.fecha_de_desembolso__factoring_, clo.fecha_desembolso) transfer_date
+   , date_trunc('day', COALESCE(DATE_ADD('hour', -5, b.interest_proforma_disbursement_date), c.fecha_de_desembolso__factoring_, clo.fecha_desembolso)) transfer_date
    , DATE_ADD('hour', -5, a.closed_at) ANTERIOR_TRANSFER
    , b.PROFORma_simulation_currency currency_auctions
    , b.currency currency_request
@@ -64,7 +64,8 @@ WITH
    , b.invoice_net_amount total_net_amount_pending_payment
    , CAST(b.proforma_client_payment_date_expected AS date) e_payment_date
    , (CASE WHEN (b.product = 'factoring') THEN b.proforma_simulation_financing_total ELSE b.proforma_simulation_financing END) amount_financed
-   , (CASE WHEN (b.interest_proforma_simulation_financing_cost_period IS NOT NULL) THEN b.interest_proforma_simulation_financing_cost_period ELSE b.proforma_simulation_financing_cost_period END) terms
+   , (CASE WHEN (b.interest_proforma_simulation_financing_cost_period IS NOT NULL) THEN b.interest_proforma_simulation_financing_cost_period ELSE b.proforma_simulation_financing_cost_period END) terms_antiguo
+   , (CASE WHEN (date_diff('day', CAST(COALESCE(DATE_ADD('hour', -5, b.interest_proforma_disbursement_date), c.fecha_de_desembolso__factoring_, clo.fecha_desembolso) AS DATE), CAST(b.proforma_client_payment_date_expected AS DATE)) < 0) THEN COALESCE(b.interest_proforma_simulation_financing_cost_period, b.proforma_simulation_financing_cost_period) ELSE date_diff('day', CAST(COALESCE(DATE_ADD('hour', -5, b.interest_proforma_disbursement_date), c.fecha_de_desembolso__factoring_, clo.fecha_desembolso) AS DATE), CAST(b.proforma_client_payment_date_expected AS DATE)) END) terms_nuevo
    , (CASE WHEN (b.product = 'factoring') THEN b.proforma_simulation_financing_advance ELSE b.invoice_net_amount END) amount_advance
    , (CASE WHEN ((b.product = 'factoring') AND (b.invoice_net_amount > 0E0)) THEN (b.proforma_simulation_financing_advance / b.invoice_net_amount) WHEN ((b.product = 'confirming') AND (b.invoice_net_amount > 0E0)) THEN (b.invoice_net_amount / b.invoice_net_amount) ELSE null END) advance_percentage
    , b.invoice_nominal_amount amount_of_invoices
@@ -135,6 +136,7 @@ FROM
 , dataset AS (
    SELECT
      b.codmes
+   , CAST(COALESCE(a.terms_nuevo, a.terms_antiguo) AS DECIMAL(18, 2)) terms
    , (CASE WHEN (current_date < date_add('day', -1, date_add('hour', 5, date_add('month', 1, date_parse(concat(b.codmes, '01'), '%Y%m%d'))))) THEN CAST(DATE_FORMAT(DATE_ADD('hour', -5, current_timestamp), '%Y-%m-%d 05:00:00.000') AS timestamp) ELSE date_add('day', -1, date_add('hour', 5, date_add('month', 1, date_parse(concat(b.codmes, '01'), '%Y%m%d')))) END) fecha_cierre
    , a.*
    FROM
@@ -324,13 +326,13 @@ SELECT DISTINCT
 , a.recurrent_clients
 , a.new_providers
 , a.recurrent_providers
-, a.remaining_capital
+, (CASE WHEN (a.actual_status = 'finalizado') THEN 0 ELSE a.remaining_capital END) remaining_capital
 , a.remaining_total_amount
 , a.actual_status
 , a.flag_excluir
 , a.dias_atraso
 , a.m_desembolso_soles
-, a.remaining_capital_soles
+, (CASE WHEN (a.actual_status = 'finalizado') THEN 0 ELSE a.remaining_capital_soles END) remaining_capital_soles
 , a.amount_financed_soles
 , a.exchange_rate
 , CAST(DATE_FORMAT(transfer_date, '%Y%m') AS VARCHAR) codmes_transfer

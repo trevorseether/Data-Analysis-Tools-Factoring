@@ -1,4 +1,4 @@
-CREATE OR REPLACE VIEW "fac_outst_offline_jmontoya" AS 
+--CREATE OR REPLACE VIEW "fac_outst_offline_jmontoya" AS 
 WITH
   cortes_mensuales AS (
    SELECT DATE_ADD('day', -1, DATE_TRUNC('month', DATE_ADD('month', (x + 1), DATE '2021-03-31'))) fecha_eomonth
@@ -22,9 +22,9 @@ WITH
    SELECT
      hubspot__deal.dealname "Code"
    , hubspot__deal.proveedor "company_name"
-   , CAST(hubspot__deal.ruc_proveedor AS VARCHAR) "company_ruc"
+   , lower(CAST(hubspot__deal.ruc_proveedor AS VARCHAR)) "company_ruc"
    , hubspot__deal.cliente "user_third_party_name"
-   , hubspot__deal.ruc_cliente "user_third_party_ruc"
+   , lower(CAST(hubspot__deal.ruc_cliente AS VARCHAR)) "user_third_party_ruc"
    , hubspot__deal.tipo_de_producto "product"
    , ROUND(hubspot__deal.monto_adelanto, 2) "monto_de_adelanto"
    , ROUND(hubspot__deal.monto_financiado, 2) "monto_financiado"
@@ -143,7 +143,7 @@ WHERE (dealstage = '1115970054')
    , cm.fecha_eomonth fecha_cierre
    , DATE_FORMAT(cm.fecha_eomonth, '%Y%m') codmes
    , DP.product product_type
-   , CAST(CAST(CAST(DP.user_third_party_ruc AS DOUBLE) AS BIGINT) AS VARCHAR) client_ruc
+   , CAST(CAST(CAST(replace(DP.user_third_party_ruc, '.com', '') AS DOUBLE) AS BIGINT) AS VARCHAR) client_ruc
    , DP.user_third_party_name client_name
    , CAST(TRY_CAST(replace(DP.company_ruc, '.com', '') AS BIGINT) AS VARCHAR) provider_ruc
    , DP.company_name provider_name
@@ -189,32 +189,13 @@ WHERE (dealstage = '1115970054')
    , 0 recurrent_clients
    , 0 new_providers
    , 0 recurrent_providers
-   , (CASE 
-   
-   WHEN (dp."MES CANCELACION" = cm.fecha_eomonth) THEN 0 
-   WHEN (NCPT."NUEVO_CAPITAL" IS NOT NULL) THEN NCPT."NUEVO_CAPITAL" 
-   ELSE greatest(round((dp.monto_financiado - COALESCE(dp.amortizado_tickets, 0)), 2), 0) END) 
-   
-   
-   remaining_capital
+   , (CASE WHEN (dp."MES CANCELACION" = cm.fecha_eomonth) THEN 0 WHEN (NCPT."NUEVO_CAPITAL" IS NOT NULL) THEN NCPT."NUEVO_CAPITAL" ELSE greatest(round((dp.monto_financiado - COALESCE(dp.amortizado_tickets, 0)), 2), 0) END) remaining_capital
    , (CASE WHEN (NCPT."NUEVO_CAPITAL" IS NOT NULL) THEN NCPT."NUEVO_CAPITAL" WHEN (cm.fecha_eomonth < DP."FECHA CANCELACION") THEN dp.monto_neto_de_facturas__factoring_ ELSE 0 END) remaining_total_amount
    , (CASE WHEN (CM.fecha_eomonth = DP."MES CANCELACION") THEN 'finalizado' ELSE 'vigente' END) actual_status
    , false flag_excluir
-   , (CASE WHEN (DP.e_payment_date > CM.fecha_eomonth) THEN 0 WHEN ((DP.e_payment_date < CM.fecha_eomonth) AND (DP."FECHA CANCELACION" IS NOT NULL) AND (DP."FECHA CANCELACION" > CM.fecha_eomonth)) THEN DATE_DIFF('day', DP.e_payment_date, CM.fecha_eomonth) WHEN (DP."FECHA CANCELACION" IS NULL) THEN DATE_DIFF('day', DP.e_payment_date, CM.fecha_eomonth) WHEN (DP."FECHA CANCELACION" < CM.fecha_eomonth) THEN 0 END) "dias_atraso"
+   , (CASE WHEN (DP.e_payment_date > CM.fecha_eomonth) THEN 0 WHEN ((CM.fecha_eomonth < DP."MES CANCELACION") AND (DATE_FORMAT(CAST((current_timestamp - INTERVAL  '5' HOUR) AS date), '%Y%m') = DATE_FORMAT(CM.fecha_eomonth, '%Y%m'))) THEN date_diff('day', CAST(DP.e_payment_date AS date), CAST((current_timestamp - INTERVAL  '5' HOUR) AS date)) WHEN ((DP.e_payment_date < CM.fecha_eomonth) AND (DP."FECHA CANCELACION" IS NOT NULL) AND (DP."FECHA CANCELACION" > CM.fecha_eomonth)) THEN DATE_DIFF('day', DP.e_payment_date, CM.fecha_eomonth) WHEN (DP."FECHA CANCELACION" IS NULL) THEN DATE_DIFF('day', DP.e_payment_date, CM.fecha_eomonth) WHEN (DP."FECHA CANCELACION" < CM.fecha_eomonth) THEN 0 END) "dias_atraso"
    , (CASE WHEN ((cm.fecha_eomonth = DP.MES_DESEMBOLSO) AND (DP.moneda_del_monto_financiado = 'PEN')) THEN dp.monto_financiado WHEN ((cm.fecha_eomonth = DP.MES_DESEMBOLSO) AND (DP.moneda_del_monto_financiado = 'USD')) THEN (dp.monto_financiado * tc.exchange_rate) ELSE 0 END) m_desembolso_soles
-   ,
-   CASE 
-   WHEN (dp."MES CANCELACION" = cm.fecha_eomonth) THEN 0 
-   WHEN (NCPT."NUEVO_CAPITAL" IS NOT NULL) AND (DP.moneda_del_monto_financiado = 'PEN') THEN round(NCPT."NUEVO_CAPITAL", 2) 
-   WHEN (NCPT."NUEVO_CAPITAL" IS NOT NULL) AND (DP.moneda_del_monto_financiado = 'USD') THEN round(NCPT."NUEVO_CAPITAL" * tc.exchange_rate, 2)
-   WHEN (NCPT."NUEVO_CAPITAL" IS     NULL) AND (DP.moneda_del_monto_financiado = 'PEN') 
-            THEN greatest(round((dp.monto_financiado - COALESCE(dp.amortizado_tickets, 0)), 2), 0)
-   WHEN (NCPT."NUEVO_CAPITAL" IS     NULL) AND (DP.moneda_del_monto_financiado = 'USD') 
-            THEN ROUND(greatest(round((dp.monto_financiado - COALESCE(dp.amortizado_tickets, 0)), 2), 0) * tc.exchange_rate, 2)
-   ELSE dp.monto_financiado
-   
-   END AS remaining_capital_soles
-   
+   , (CASE WHEN (dp."MES CANCELACION" = cm.fecha_eomonth) THEN 0 WHEN ((NCPT."NUEVO_CAPITAL" IS NOT NULL) AND (DP.moneda_del_monto_financiado = 'PEN')) THEN round(NCPT."NUEVO_CAPITAL", 2) WHEN ((NCPT."NUEVO_CAPITAL" IS NOT NULL) AND (DP.moneda_del_monto_financiado = 'USD')) THEN round((NCPT."NUEVO_CAPITAL" * tc.exchange_rate), 2) WHEN ((NCPT."NUEVO_CAPITAL" IS NULL) AND (DP.moneda_del_monto_financiado = 'PEN')) THEN greatest(round((dp.monto_financiado - COALESCE(dp.amortizado_tickets, 0)), 2), 0) WHEN ((NCPT."NUEVO_CAPITAL" IS NULL) AND (DP.moneda_del_monto_financiado = 'USD')) THEN ROUND((greatest(round((dp.monto_financiado - COALESCE(dp.amortizado_tickets, 0)), 2), 0) * tc.exchange_rate), 2) ELSE dp.monto_financiado END) remaining_capital_soles
    , (CASE WHEN (DP.moneda_del_monto_financiado = 'PEN') THEN dp.monto_financiado WHEN (DP.moneda_del_monto_financiado = 'USD') THEN (dp.monto_financiado * tc.exchange_rate) END) amount_financed_soles
    , tc.exchange_rate exchange_rate
    , DATE_FORMAT(DP.Fecha_de_desembolso_hub, '%Y%m') codmes_transfer
