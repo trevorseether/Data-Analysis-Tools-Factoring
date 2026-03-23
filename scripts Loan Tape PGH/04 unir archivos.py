@@ -358,6 +358,9 @@ loans['ltv'] = '=(Q2/3.6)/AD2'
 # añadiendo recuperaciones
 fechas_castigo = pd.read_excel('G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/Reportes/salidas/castigos automatizados.xlsx')
 
+fechas_castigo['fecha_castigo'] = (pd.to_datetime(fechas_castigo['cierre'].astype(str), format='%Y%m') + pd.offsets.MonthEnd(0))
+
+#%% 
 query = '''
 select 
     last_day_of_month(date_parse(cast(cierre as varchar), '%Y%m')) as fecha_cierre
@@ -377,7 +380,7 @@ portafolio = pd.DataFrame(resultados, columns = column_names)
 portafolio['begin_date'] = pd.to_datetime(portafolio['begin_date'])
 portafolio['mes_desembolso'] = portafolio['begin_date'] + pd.offsets.MonthEnd(0)
 
-cods = portafolio[['loan_id','contract_id']].drop_duplicates(subset = 'loan_id', keep = 'first')
+cods = portafolio[['loan_id','contract_id', 'begin_date']].drop_duplicates(subset = 'loan_id', keep = 'first')
 
 fecha_inf = '2021-01-01'
 fecha_sup = '2025-12-31'
@@ -387,6 +390,7 @@ desembolsos = desembolsos[(desembolsos['mes_desembolso'] >= pd.Timestamp(fecha_i
 desembolsos = desembolsos.drop_duplicates(subset = 'mes_desembolso', keep = 'first')
 desembolsos = desembolsos.sort_values(by='mes_desembolso').reset_index(drop=True)
 m_desembolsado = portafolio[portafolio['q_desembolsado'] == 1]
+
 m_desembolsado = m_desembolsado.pivot_table(index   = 'mes_desembolso',
                                             values  = 'loan_amount_soles',
                                             aggfunc = 'sum').reset_index()
@@ -403,6 +407,24 @@ pivot_cosecha = portafolio.pivot_table(index   = 'mes_desembolso',
 desembolsos = desembolsos.merge(pivot_cosecha,
                                 on  = 'mes_desembolso',
                                 how = 'left')
+
+###############cods para incluir las fechas de castigo#########################
+cods = cods.merge(fechas_castigo[['fecha_castigo', 'contract_id']],
+                  on  = 'contract_id',
+                  how = 'left')
+cods = cods[cods['fecha_castigo'].notna()]
+cods = cods[cods['fecha_castigo'] >= cods['begin_date']]
+
+loans = loans.merge(cods[['loan_id', 'fecha_castigo']],
+                    on  = 'loan_id',
+                    how = 'left')
+
+loans['pagos_recuperados'] = '''.=SUMAR.SI.CONJUNTO(
+'Payments File'!D:D;
+'Payments File'!A:A;'Loans File'!A2;
+'Payments File'!C:C;">="&'Loans File'!AI2
+)
+'''
 
 #%%
 '''
