@@ -16,9 +16,10 @@ from datetime import datetime, timezone, timedelta
 peru_tz = timezone(timedelta(hours=-5))
 today_date = datetime.now(peru_tz).strftime('%Y%m%d')
 
+today_date = '20260320'
 #%%
 crear_excel = True # crear excel, True o False
-cargar_lake = True # cargar al lake, True o False
+cargar_lake = False # cargar al lake, True o False
 cierre = '202602'
 os.chdir(rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} existing')
 
@@ -380,7 +381,7 @@ portafolio = pd.DataFrame(resultados, columns = column_names)
 portafolio['begin_date'] = pd.to_datetime(portafolio['begin_date'])
 portafolio['mes_desembolso'] = portafolio['begin_date'] + pd.offsets.MonthEnd(0)
 
-cods = portafolio[['loan_id','contract_id', 'begin_date']].drop_duplicates(subset = 'loan_id', keep = 'first')
+df_cods = portafolio[['loan_id','contract_id', 'begin_date', 'loan_amount_soles']].drop_duplicates(subset = 'loan_id', keep = 'first')
 
 fecha_inf = '2021-01-01'
 fecha_sup = '2025-12-31'
@@ -409,7 +410,7 @@ desembolsos = desembolsos.merge(pivot_cosecha,
                                 how = 'left')
 
 ###############cods para incluir las fechas de castigo#########################
-cods = cods.merge(fechas_castigo[['fecha_castigo', 'contract_id']],
+cods = df_cods.merge(fechas_castigo[['fecha_castigo', 'contract_id']],
                   on  = 'contract_id',
                   how = 'left')
 cods = cods[cods['fecha_castigo'].notna()]
@@ -426,6 +427,74 @@ loans['pagos_recuperados'] = '''.=SUMAR.SI.CONJUNTO(
 )
 '''
 
+#%% añadiendo las recuperaciones de diego cordoba
+recup = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/Recuperaciones - Diego Cordova.xlsx',
+                      sheet_name = 'CASOS RECUPERADOS',
+                      skiprows   = 0)
+recup = recup[['N° CONTRATO', 'MONTO DE CANCELACIÓN']]
+recup['MONTO DE CANCELACIÓN'] = recup['MONTO DE CANCELACIÓN'].str.replace('S/.', '', regex = False).str.replace('S/', '', regex = False).str.strip().str.replace(',','', regex = False)
+recup['MONTO DE CANCELACIÓN'] = recup['MONTO DE CANCELACIÓN'].str.replace('-', '0', regex = False)
+recup['MONTO DE CANCELACIÓN'] = recup['MONTO DE CANCELACIÓN'].astype(float)
+recup = recup[recup['MONTO DE CANCELACIÓN'] > 0]
+recup = recup.merge(df_cods,
+                    left_on  = 'N° CONTRATO',
+                    right_on = 'contract_id',
+                    how      = 'left')
+
+op_mas_reciente = recup.pivot_table(index   = 'contract_id',
+                                    values  = 'begin_date',
+                                    aggfunc = 'max').reset_index()
+op_mas_reciente['flag_ultimo'] = 1
+recup = recup.merge(op_mas_reciente,
+                    on  = ['contract_id', 'begin_date'],
+                    how = 'left')
+recup = recup[recup['flag_ultimo'] == 1]
+
+recup_proporcion = recup.pivot_table(values  = 'loan_amount_soles',
+                                     index   = 'N° CONTRATO',
+                                     aggfunc = 'sum').reset_index()
+recup_proporcion.rename(columns={'loan_amount_soles': 'suma_amount'}, inplace=True)
+
+recup = recup.merge(recup_proporcion,
+                    on  = 'N° CONTRATO',
+                    how = 'left')
+recup['percent_'] = recup['loan_amount_soles'] / recup['suma_amount']
+recup['proporcional_monto_cancelacion'] = recup['percent_'] * recup['MONTO DE CANCELACIÓN']
+recup['proporcional_monto_cancelacion'] = recup['proporcional_monto_cancelacion'].round(2)
+
+loans = loans.merge(recup[['loan_id', 'proporcional_monto_cancelacion']],
+                    on  = 'loan_id',
+                    how = 'left')
+
+#%% incluyendo las recuperaciones del área legal
+legal = pd.read_excel(r'G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/archivos/Copia de MATRIZ DE SEGUIMIENTO DE PROCESOS ARBITRALES - 2025.xlsx',
+                      sheet_name = 'Proc. Terminados',
+                      skiprows   = 1)
+legal = legal[['FECHA EXP', 'CONTRATO', 'MONTO DE CANCELACIÓN DE DEUDA']]
+legal['MONTO DE CANCELACIÓN DE DEUDA'] = legal['MONTO DE CANCELACIÓN DE DEUDA'].str.replace('S/.', '', regex = False).str.replace('S/', '', regex = False).str.strip().str.replace(',','', regex = False)
+legal['MONTO DE CANCELACIÓN DE DEUDA'] = legal['MONTO DE CANCELACIÓN DE DEUDA'].astype(float)
+legal = legal[legal['MONTO DE CANCELACIÓN DE DEUDA'] >= 0]
+
+legal = legal.merge(df_cods,
+                    left_on  = 'CONTRATO',
+                    right_on = 'contract_id',
+                    how      = 'left')
+legal_proporcion = legal.pivot_table(values  = 'loan_amount_soles',
+                                     index   = 'CONTRATO',
+                                     aggfunc = 'sum').reset_index()
+legal_proporcion.rename(columns={'loan_amount_soles': 'suma_amount'}, inplace=True)
+
+legal = legal.merge(legal_proporcion,
+                    on  = 'CONTRATO',
+                    how = 'left')
+
+legal['percent_'] = legal['loan_amount_soles'] / legal['suma_amount']
+legal['proporcional_monto_cancelacion_legal'] = legal['percent_'] * legal['MONTO DE CANCELACIÓN DE DEUDA']
+legal['proporcional_monto_cancelacion_legal'] = legal['proporcional_monto_cancelacion_legal'].round(2)
+
+loans = loans.merge(legal[['loan_id', 'proporcional_monto_cancelacion_legal']],
+                    on  = 'loan_id',
+                    how = 'left')
 #%%
 '''
 # Guardar en un mismo Excel con varias hojas
