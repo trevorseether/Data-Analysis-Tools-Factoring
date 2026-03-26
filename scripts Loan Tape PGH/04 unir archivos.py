@@ -360,7 +360,7 @@ loans['ltv'] = '=(Q2/3.6)/AD2'
 fechas_castigo = pd.read_excel('G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/Reportes/salidas/castigos automatizados.xlsx')
 
 fechas_castigo['fecha_castigo'] = (pd.to_datetime(fechas_castigo['cierre'].astype(str), format='%Y%m') + pd.offsets.MonthEnd(0))
-
+fechas_castigo['fecha_castigo'] = fechas_castigo['fecha_castigo']
 #%% 
 query = '''
 select 
@@ -381,6 +381,21 @@ portafolio = pd.DataFrame(resultados, columns = column_names)
 portafolio['begin_date'] = pd.to_datetime(portafolio['begin_date'])
 portafolio['mes_desembolso'] = portafolio['begin_date'] + pd.offsets.MonthEnd(0)
 
+##### parentesis para colocar el saldo al momento del castigo #################
+portafolio['fecha_cierre'] = pd.to_datetime(portafolio['fecha_cierre'])
+castigos = fechas_castigo.merge(portafolio[['loan_id', 'contract_id', 'cierre', 'capital_soles']],
+                                on  = ['contract_id', 'cierre'],
+                                how = 'left')
+
+castigos.rename(columns={'capital_soles': 'capital_soles al momento del castigo'}, inplace=True)
+castigos = castigos[castigos['capital_soles al momento del castigo'] > 0]
+castigos['capital_soles al momento del castigo'] = castigos['capital_soles al momento del castigo'].round(2)
+
+loans = loans.merge(castigos[['loan_id', 'capital_soles al momento del castigo']],
+                    on  = 'loan_id',
+                    how = 'left')
+
+###############################################################################
 df_cods = portafolio[['loan_id','contract_id', 'begin_date', 'loan_amount_soles']].drop_duplicates(subset = 'loan_id', keep = 'first')
 
 fecha_inf = '2021-01-01'
@@ -419,6 +434,10 @@ cods = cods[cods['fecha_castigo'] >= cods['begin_date']]
 loans = loans.merge(cods[['loan_id', 'fecha_castigo']],
                     on  = 'loan_id',
                     how = 'left')
+
+loans['fecha_castigo'] = loans['fecha_castigo'].where(
+                            loans['capital_soles al momento del castigo'].notna(),
+                            pd.NaT)
 
 loans['pagos_recuperados'] = '''.=SUMAR.SI.CONJUNTO(
 'Payments File'!D:D;

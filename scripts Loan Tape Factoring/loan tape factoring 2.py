@@ -954,6 +954,91 @@ df = df.merge(df_zonas_cols,
 
 del df['code']
 
+#%% calculo del DPD BUCKETS
+query = ''' 
+select * from prod_datalake_master.ba__fac_outstanding_monthly_snapshot
+
+'''
+cursor = conn.cursor()
+cursor.execute(query)
+# Obtener los resultados
+resultados = cursor.fetchall()
+# Obtener los nombres de las columnas
+column_names = [desc[0] for desc in cursor.description]
+# Convertir los resultados a un DataFrame de pandas
+df_portafolio = pd.DataFrame(resultados, columns = column_names)
+
+df_portafolio = df_portafolio[df_portafolio['code'].isin(list(df['loan_id']))]
+
+df_portafolio['remaining_capital_soles'] = df_portafolio['remaining_capital_soles'].fillna(0)
+
+df_portafolio['current DPD 0'] = np.where(df_portafolio['dias_atraso'] == 0,
+                                          df_portafolio['remaining_capital_soles'],
+                                          0)
+df_portafolio['current DPD 1 - 7'] = np.where((df_portafolio['dias_atraso'] > 0) & (df_portafolio['dias_atraso'] <= 7),
+                                               df_portafolio['remaining_capital_soles'],
+                                               0)
+df_portafolio['current DPD 8 - 14'] = np.where((df_portafolio['dias_atraso'] >= 8) & (df_portafolio['dias_atraso'] <= 14),
+                                               df_portafolio['remaining_capital_soles'],
+                                               0)
+df_portafolio['current DPD 15 - 30'] = np.where((df_portafolio['dias_atraso'] >= 15) & (df_portafolio['dias_atraso'] <= 30),
+                                               df_portafolio['remaining_capital_soles'],
+                                               0)
+df_portafolio['current DPD 31 - 60'] = np.where((df_portafolio['dias_atraso'] >= 31) & (df_portafolio['dias_atraso'] <= 60),
+                                               df_portafolio['remaining_capital_soles'],
+                                               0)
+df_portafolio['current DPD 61 - 90'] = np.where((df_portafolio['dias_atraso'] >= 61) & (df_portafolio['dias_atraso'] <= 90),
+                                               df_portafolio['remaining_capital_soles'],
+                                               0)
+df_portafolio['current DPD 91 - 120'] = np.where((df_portafolio['dias_atraso'] >= 91) & (df_portafolio['dias_atraso'] <= 120),
+                                               df_portafolio['remaining_capital_soles'],
+                                               0)
+df_portafolio['current DPD 121 - 180'] = np.where((df_portafolio['dias_atraso'] >= 121) & (df_portafolio['dias_atraso'] <= 180),
+                                               df_portafolio['remaining_capital_soles'],
+                                               0)
+df_portafolio['current DPD 180+'] = np.where((df_portafolio['dias_atraso'] > 180),
+                                               df_portafolio['remaining_capital_soles'],
+                                               0)
+df_portafolio['current DPD 90+'] = np.where((df_portafolio['dias_atraso'] > 90),
+                                               df_portafolio['remaining_capital_soles'],
+                                               0)
+
+df_portafolio['total outstanding'] = df_portafolio['remaining_capital_soles']
+
+dpd_analysis = df_portafolio.pivot_table(index = 'codmes',
+                                         values = ['current DPD 0', 'current DPD 1 - 7', 'current DPD 8 - 14',
+                                                   'current DPD 15 - 30', 'current DPD 31 - 60', 'current DPD 61 - 90',
+                                                   'current DPD 91 - 120', 'current DPD 121 - 180', 'current DPD 90+',
+                                                   'current DPD 180+',
+                                                   'total outstanding'],
+                                         aggfunc = 'sum').reset_index()
+dpd_analysis = dpd_analysis[['codmes', 'current DPD 0', 'current DPD 1 - 7', 'current DPD 8 - 14',
+          'current DPD 15 - 30', 'current DPD 31 - 60', 'current DPD 61 - 90',
+          'current DPD 91 - 120', 'current DPD 121 - 180', 'current DPD 90+',
+          'current DPD 180+',
+          'total outstanding']]
+dpd_analysis['% current'] = dpd_analysis['current DPD 0'] / dpd_analysis['total outstanding']
+
+dpd_analysis['% DPD 1-30'] = (dpd_analysis['current DPD 1 - 7']+dpd_analysis['current DPD 8 - 14']+dpd_analysis['current DPD 15 - 30']) / dpd_analysis['total outstanding']
+dpd_analysis['% DPD 31-90'] = (dpd_analysis['current DPD 31 - 60']+dpd_analysis['current DPD 61 - 90']) / dpd_analysis['total outstanding']
+dpd_analysis['% DPD 90+'] = dpd_analysis['current DPD 90+'] / dpd_analysis['total outstanding']
+
+#%% cálculo de default acumulado 2021 - 2025 par 30 en febrero 2026
+def_acum = df_portafolio[df_portafolio['q_desembolso'] == 1].pivot_table(index  = 'codmes_transfer',
+                                                                         values = 'amount_financed_soles',
+                                                                         aggfunc = 'sum').reset_index()
+df_par30_mes_actual = df_portafolio[df_portafolio['codmes'] == int(cierre)]
+df_par30_mes_actual = df_par30_mes_actual.pivot_table(index   = 'codmes_transfer',
+                                                      values  = 'par30_ms',
+                                                      aggfunc = 'sum').reset_index()
+
+def_acum = def_acum.merge(df_par30_mes_actual,
+                          on  = 'codmes_transfer',
+                          how = 'left')
+
+def_acum['par30_ms'] = def_acum['par30_ms'].fillna(0)
+def_acum['default'] = def_acum['par30_ms'] / def_acum['amount_financed_soles']
+
 #%%% copiar excel de ejemplo
 ejemplo_original = r'C:/Users/Joseph Montoya/Desktop/loans tape/ejemplo/ejemplo.xlsx'
 destino = f"{cierre}_Loan Tape Document For Alt Lenders Factoring Mb {hoy_formateado}.xlsx"
@@ -971,12 +1056,14 @@ if crear_excel == True:
         mode="a",                       # append en vez de sobrescribir
         if_sheet_exists="replace"       # o "new" para crear nueva hoja aunque el nombre coincida
     ) as writer:
-        df.to_excel(writer,         sheet_name="Loans File",               index =False)
-        individual.to_excel(writer, sheet_name="Individual Loan Checks",   index =False)
-        df_pagos.to_excel(writer,   sheet_name="Payments File",            index =False)
-        repayments.to_excel(writer, sheet_name="Repayment Schedules File", index =False)
-        aggregate_checks.to_excel(writer,sheet_name="agg checks",          index =False)
-
+        df.to_excel(writer,              sheet_name="Loans File",               index =False)
+        individual.to_excel(writer,      sheet_name="Individual Loan Checks",   index =False)
+        df_pagos.to_excel(writer,        sheet_name="Payments File",            index =False)
+        repayments.to_excel(writer,      sheet_name="Repayment Schedules File", index =False)
+        aggregate_checks.to_excel(writer,sheet_name="agg checks",               index =False)
+        dpd_analysis.to_excel(writer,    sheet_name="DPD Buckets",              index =False)
+        def_acum.to_excel(writer,        sheet_name="Cumulative_Default_Par30 ",index =False)
+        
 #%% Carga al lake
 if upload_s3 == True:
     ######## hoja loans ###########################################################
