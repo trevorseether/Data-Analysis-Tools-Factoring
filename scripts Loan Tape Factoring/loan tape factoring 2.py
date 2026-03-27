@@ -1039,6 +1039,39 @@ def_acum = def_acum.merge(df_par30_mes_actual,
 def_acum['par30_ms'] = def_acum['par30_ms'].fillna(0)
 def_acum['default'] = def_acum['par30_ms'] / def_acum['amount_financed_soles']
 
+#%% write off
+castigos=['lgwcnyax','Pbz6O1PQ','jwLrnXYb','lgwcx4xa','bNdzoWG6',
+          'yj90Y0v8','JEgdnQKF','iNWIhJ0p','le5w55ao','2bCzIusn',
+          '4vQ5cEuU','xcC3tvLG',
+          'ktUqf0tz', '63liGJEc', 'UB6Wnclj', 'WtmYWjuo', 'x5PDLyLR',
+          '93DfOT0S','taZ0mAYW']
+fecha_castigo = [ 202401, 202402, 202402, 202402, 202403,
+                  202406, 202406, 202406, 202311, 202403,
+                  202403, 202403,
+                  202504, 202504, 202504, 202504, 202504,
+                  202506, 202506]
+df_castigos = pd.DataFrame({
+    'castigo': castigos,
+    'fecha_castigo': fecha_castigo
+})
+df_castigos = df_castigos.merge(df_portafolio[['code', 'codmes', 'remaining_capital_soles']],
+                                left_on  = ['castigo', 'fecha_castigo'],
+                                right_on = ['code', 'codmes'],
+                                how      = 'left')
+df_castigos = df_castigos[['code', 'codmes', 'remaining_capital_soles']]
+df_castigos.rename(columns = {'code': 'loan_id',
+                              'codmes': 'codmes_castigo',
+                              'remaining_capital_soles': 'capital_castigado'}, inplace = True)
+df_castigos = df_castigos[df_castigos['capital_castigado'] >=  0]
+
+df_castigos['fecha_castigo'] = (pd.to_datetime(df_castigos['codmes_castigo'].astype(str), format='%Y%m') + pd.offsets.MonthEnd(0))
+
+df = df.merge(df_castigos[['loan_id', 'fecha_castigo', 'capital_castigado']],
+              on  = 'loan_id',
+              how = 'left')
+
+df['recuperaciones'] = 0
+
 #%%% copiar excel de ejemplo
 ejemplo_original = r'C:/Users/Joseph Montoya/Desktop/loans tape/ejemplo/ejemplo.xlsx'
 destino = f"{cierre}_Loan Tape Document For Alt Lenders Factoring Mb {hoy_formateado}.xlsx"
@@ -1052,9 +1085,9 @@ if crear_excel == True:
 if crear_excel == True:
     with pd.ExcelWriter(
         destino,
-        engine="openpyxl",
-        mode="a",                       # append en vez de sobrescribir
-        if_sheet_exists="replace"       # o "new" para crear nueva hoja aunque el nombre coincida
+        engine          = "openpyxl",
+        mode            = "a",           # append en vez de sobrescribir
+        if_sheet_exists = "replace"      # o "new" para crear nueva hoja aunque el nombre coincida
     ) as writer:
         df.to_excel(writer,              sheet_name="Loans File",               index =False)
         individual.to_excel(writer,      sheet_name="Individual Loan Checks",   index =False)

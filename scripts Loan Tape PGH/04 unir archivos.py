@@ -442,7 +442,7 @@ loans['fecha_castigo'] = loans['fecha_castigo'].where(
 loans['pagos_recuperados'] = '''.=SUMAR.SI.CONJUNTO(
 'Payments File'!D:D;
 'Payments File'!A:A;'Loans File'!A2;
-'Payments File'!C:C;">="&'Loans File'!AI2
+'Payments File'!C:C;">="&'Loans File'!AJ2
 )
 '''
 
