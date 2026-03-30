@@ -1059,8 +1059,8 @@ df_castigos = df_castigos.merge(df_portafolio[['code', 'codmes', 'remaining_capi
                                 right_on = ['code', 'codmes'],
                                 how      = 'left')
 df_castigos = df_castigos[['code', 'codmes', 'remaining_capital_soles']]
-df_castigos.rename(columns = {'code': 'loan_id',
-                              'codmes': 'codmes_castigo',
+df_castigos.rename(columns = {'code'                   : 'loan_id',
+                              'codmes'                 : 'codmes_castigo',
                               'remaining_capital_soles': 'capital_castigado'}, inplace = True)
 df_castigos = df_castigos[df_castigos['capital_castigado'] >=  0]
 
@@ -1070,7 +1070,7 @@ df = df.merge(df_castigos[['loan_id', 'fecha_castigo', 'capital_castigado']],
               on  = 'loan_id',
               how = 'left')
 
-df['recuperaciones'] = 0
+df['recuperaciones'] = """.=SUMAR.SI.CONJUNTO('Payments File'!E:E;'Payments File'!A:A;'Loans File'!A2;'Payments File'!C:C;">="&'Loans File'!AT2)"""
 
 #%%% copiar excel de ejemplo
 ejemplo_original = r'C:/Users/Joseph Montoya/Desktop/loans tape/ejemplo/ejemplo.xlsx'

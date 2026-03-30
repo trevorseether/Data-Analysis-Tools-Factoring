@@ -17,6 +17,9 @@ peru_tz = timezone(timedelta(hours=-5))
 today_date = datetime.now(peru_tz).strftime('%Y%m%d')
 
 today_date = '20260320'
+
+fecha_escritura = datetime.now(peru_tz).strftime('%Y-%m-%d')
+
 #%%
 crear_excel = True # crear excel, True o False
 cargar_lake = False # cargar al lake, True o False
@@ -415,12 +418,29 @@ desembolsos = desembolsos.merge(m_desembolsado,
                                 how = 'left')
 
 portafolio = portafolio[(portafolio['mes_desembolso'] >= pd.Timestamp(fecha_inf)) & (portafolio['status'] == 'VIGENTE')]
-pivot_cosecha = portafolio.pivot_table(index   = 'mes_desembolso',
+
+
+pivot_cosecha_30 = portafolio.pivot_table(index   = 'mes_desembolso',
                                        columns = 'cierre',
                                        values  = 'capital_30d',
                                        aggfunc = 'sum').reset_index()
+pivot_cosecha_60 = portafolio.pivot_table(index   = 'mes_desembolso',
+                                       columns = 'cierre',
+                                       values  = 'capital_60d',
+                                       aggfunc = 'sum').reset_index()
+pivot_cosecha_90 = portafolio.pivot_table(index   = 'mes_desembolso',
+                                       columns = 'cierre',
+                                       values  = 'capital_90d',
+                                       aggfunc = 'sum').reset_index()
 
-desembolsos = desembolsos.merge(pivot_cosecha,
+
+vintage_30 = desembolsos.merge(pivot_cosecha_30,
+                                on  = 'mes_desembolso',
+                                how = 'left')
+vintage_60 = desembolsos.merge(pivot_cosecha_60,
+                                on  = 'mes_desembolso',
+                                how = 'left')
+vintage_90 = desembolsos.merge(pivot_cosecha_90,
                                 on  = 'mes_desembolso',
                                 how = 'left')
 
@@ -514,6 +534,33 @@ legal['proporcional_monto_cancelacion_legal'] = legal['proporcional_monto_cancel
 loans = loans.merge(legal[['loan_id', 'proporcional_monto_cancelacion_legal']],
                     on  = 'loan_id',
                     how = 'left')
+
+################ recuperaciones legal en el bd pagos ##########################
+query = ''' 
+
+select 
+    codigo_operacion as loan_id, 
+    sum(coalesce(monto_total_pagado_al_credito,0)) as recuperacion_legal
+from prod_datalake_master.bd_pagos__bd_pagos_finalizados
+where condicion_asignada = 'CANCELADO CON ARBITRAJE'
+and monto_total_pagado_al_credito > 10000
+
+group by codigo_operacion
+
+'''
+cursor = conn.cursor()
+cursor.execute(query)
+# Obtener los resultados
+resultados = cursor.fetchall()
+# Obtener los nombres de las columnas
+column_names = [desc[0] for desc in cursor.description]
+# Convertir los resultados a un DataFrame de pandas
+castigos_bd_pagos = pd.DataFrame(resultados, columns = column_names)
+
+loans = loans.merge(castigos_bd_pagos,
+                    on  = 'loan_id',
+                    how = 'left')
+
 #%%
 '''
 # Guardar en un mismo Excel con varias hojas
@@ -527,7 +574,7 @@ with pd.ExcelWriter(f"{cierre}_Loan Tape Document For Alt Lenders_moises_barruet
 #%%% copiar excel de ejemplo
 if crear_excel == True:
     ejemplo_original = r'C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/ejemplo.xlsx'
-    destino = f"{cierre}_Loan Tape Document For Alt Lenders_moises_barrueta V2.xlsx"
+    destino = f"{cierre}_Loan Tape Document For Alt Lenders_moises_barrueta V2 {fecha_escritura}.xlsx"
     
     # Copiar y renombrar al mismo tiempo
     shutil.copy(ejemplo_original, destino)
@@ -546,7 +593,10 @@ if crear_excel == True:
         repayments.to_excel(writer,  sheet_name="Repayment Schedules File", index = False)
         payments.to_excel(writer,    sheet_name="Payments File",            index = False)
         aggregate_checks.to_excel(writer, sheet_name="agg checks",          index = False)
-        desembolsos.to_excel(writer, sheet_name="Vintage Default",          index = False)
+        vintage_30.to_excel(writer,  sheet_name="Vintage Default 30",       index = False)
+        vintage_60.to_excel(writer,  sheet_name="Vintage Default 60",       index = False)
+        vintage_90.to_excel(writer,  sheet_name="Vintage Default 90",       index = False)
+
     print('excel creado')
 
 #%%
