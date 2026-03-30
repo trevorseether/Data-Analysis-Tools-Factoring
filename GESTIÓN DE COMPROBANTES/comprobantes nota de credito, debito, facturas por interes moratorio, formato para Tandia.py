@@ -52,8 +52,6 @@ df_emitidos = df_emitidos[df_emitidos['TIPO DE COMPROBANTE'].str.contains('NOTA 
 com_vinculado = ['']
 df_emitidos = df_emitidos[ ~df_emitidos['COM. VINCULADO'].isin(com_vinculado)]
 
-
-
 # omitir los que tienen garantía negativa
 df_online = df_online[ ~(df_online['GARANTIA NEGATIVA'] < 0) ]
 
