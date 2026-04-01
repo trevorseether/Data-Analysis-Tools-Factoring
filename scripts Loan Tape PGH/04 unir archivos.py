@@ -55,15 +55,17 @@ loans['principal_amount'] = loans['principal_amount'].round(2)
 
 loans['percent_Fee'] = loans['FEE'].fillna(0) / loans['principal_amount']
 
-loans['FEE'] = """.=REDONDEAR(V2*Q2;2)"""
+# loans['FEE'] = """.=REDONDEAR(V2*Q2;2)"""
+loans['FEE'] = """.=REDONDEAR(W2*R2;2)"""
 
 #%% añadiendo columna en Loans
 # loans['Importe Solicitado'] = '=+Q2'
-loans['Importe Principal']  = '=+Q2-U2'
+# loans['Importe Principal']  = '=+Q2-U2'
+loans['Importe Principal']  ='=+R2-V2'
 loans['Interes']            = """.=SUMAR.SI.CONJUNTO('Repayment Schedules File'!E:E;'Repayment Schedules File'!A:A;'Loans File'!A2)"""
-loans['Ganancia Total']     = '=+Q2+X2'
-loans['interest_outstanding'] = """.=SI(G2="CLOSED";0;MAX(REDONDEAR(X2-SUMAR.SI.CONJUNTO('Payments File'!F:F;'Payments File'!A:A;'Loans File'!A2);2);0))"""
-
+loans['Ganancia Total']     = '=+R2+Y2'
+# loans['interest_outstanding'] = """.=SI(G2="CLOSED";0;MAX(REDONDEAR(X2-SUMAR.SI.CONJUNTO('Payments File'!F:F;'Payments File'!A:A;'Loans File'!A2);2);0))"""
+loans['interest_outstanding'] = """.=SI(H2="CLOSED";0;MAX(REDONDEAR(Y2-SUMAR.SI.CONJUNTO('Payments File'!F:F;'Payments File'!A:A;'Loans File'!A2);2);0))"""
 columnas_loans = [  'loan_id',
                     'customer_id',
                     'customer_birth_year',
@@ -105,6 +107,8 @@ columnas_loans = [  'loan_id',
                     'renewed_id'
                         ]
 loans = loans[columnas_loans]
+
+loans['currency'] = loans['currency'].fillna('PEN')
 
 #%%
 # Calculando collateral_value vacíos
@@ -154,13 +158,13 @@ valores = [count_of_loans, count_unique_clients, fully_paid_loans, defaulted_loa
 
 #%% ecuaciones loan tape
 e1 = """.=CONTARA('Loans File'!A:A)-1"""
-e2 = """.=CONTARA(UNICOS('Loans File'!B:B))-1"""
-e3 = """.=+CONTAR.SI.CONJUNTO('Loans File'!G:G;"CLOSED")"""
-e4 = """.=CONTAR.SI.CONJUNTO('Loans File'!G:G;"<>CLOSED";'Loans File'!AB:AB;">"&90)"""
+e2 = """.=CONTARA(UNICOS('Loans File'!C:C))-1"""
+e3 = """.=+CONTAR.SI.CONJUNTO('Loans File'!H:H;"CLOSED")"""
+e4 = """.=CONTAR.SI.CONJUNTO('Loans File'!H:H;"<>CLOSED";'Loans File'!AC:AC;">"&90)"""
 e5 = """.=SUMA('Individual Loan Checks'!H:H)"""
 e6 = """.=SUMA('Individual Loan Checks'!D:D)"""
 e7 = """.=SUMA('Individual Loan Checks'!I:I)"""
-e8 = """.=SUMAR.SI.CONJUNTO('Loans File'!AA:AA;'Loans File'!G:G;"CURRENT";'Loans File'!AA:AA;">0")"""
+e8 = """.=SUMAR.SI.CONJUNTO('Loans File'!AB:AB;'Loans File'!H:H;"CURRENT";'Loans File'!AA:AA;">0")"""
 e9 = ''
 e10= ''
 
@@ -357,13 +361,14 @@ individuals = individuals.merge(zonas_cols,
                                 how = 'left')
 
 #%% AÑADIENDO COLUMNAS EXTRAS A LOANS
-loans['ltv'] = '=(Q2/3.6)/AD2'
+loans['ltv'] = '.=(BUSCARV(B2;contract_loan_amount_PEN!A:B;2;0)/3.6)/AE2'
 
 # añadiendo recuperaciones
 fechas_castigo = pd.read_excel('G:/.shortcut-targets-by-id/103C1ITMg88pYuTOUdrxjoOtU5u15eVkj/Cierre PGH/Reportes/salidas/castigos automatizados.xlsx')
 
 fechas_castigo['fecha_castigo'] = (pd.to_datetime(fechas_castigo['cierre'].astype(str), format='%Y%m') + pd.offsets.MonthEnd(0))
 fechas_castigo['fecha_castigo'] = fechas_castigo['fecha_castigo']
+
 #%% 
 query = '''
 select 
@@ -383,6 +388,21 @@ column_names = [desc[0] for desc in cursor.description]
 portafolio = pd.DataFrame(resultados, columns = column_names)
 portafolio['begin_date'] = pd.to_datetime(portafolio['begin_date'])
 portafolio['mes_desembolso'] = portafolio['begin_date'] + pd.offsets.MonthEnd(0)
+
+########### obteniendo el monto desembolsado a nivel de contract_id para ltv
+monto_contract = portafolio[portafolio['q_desembolsado'] == 1]
+monto_contract['cierre'] = monto_contract['cierre'].astype(int)
+min_cierre = monto_contract.pivot_table(values  = 'cierre',
+                                        index   = 'contract_id',
+                                        aggfunc = 'min').reset_index()
+min_cierre['min cierre'] = min_cierre['cierre']
+monto_contract = monto_contract.merge(min_cierre[['contract_id', 'min cierre']])
+monto_contract = monto_contract[monto_contract['cierre'] == monto_contract['min cierre']]
+
+
+monto_contract = monto_contract.pivot_table(values  = 'loan_amount_soles',  #'loan_amount_recieved_soles', # loan_amount_soles
+                                            index   = 'contract_id',
+                                            aggfunc = 'sum').reset_index()
 
 ##### parentesis para colocar el saldo al momento del castigo #################
 portafolio['fecha_cierre'] = pd.to_datetime(portafolio['fecha_cierre'])
@@ -462,7 +482,7 @@ loans['fecha_castigo'] = loans['fecha_castigo'].where(
 loans['pagos_recuperados'] = '''.=SUMAR.SI.CONJUNTO(
 'Payments File'!D:D;
 'Payments File'!A:A;'Loans File'!A2;
-'Payments File'!C:C;">="&'Loans File'!AJ2
+'Payments File'!C:C;">="&'Loans File'!AK2
 )
 '''
 
@@ -561,6 +581,35 @@ loans = loans.merge(castigos_bd_pagos,
                     on  = 'loan_id',
                     how = 'left')
 
+#%% añadiendo contract_id al loans
+
+loans = loans.merge(df_cods[['loan_id', 'contract_id']],
+                    on  = 'loan_id',
+                    how = 'left')
+
+# si no están en el portafolio, los filtro
+loans = loans[loans['contract_id'].notna()]
+
+# reemplazo de valores puntuales
+loans.loc[(loans['contract_id'] == 'P00012'),'collateral_value'] = 270000
+
+# ordenamiento
+loans = loans[['loan_id', 'contract_id', 'customer_id', 'customer_birth_year', 'customer_gender',
+       'customer_sector', 'branch', 'status', 'credit_situation', 'product',
+       'asset_product', 'currency', 'loan_purpose', 'begin_date',
+       'maturity_date', 'original_maturity_date', 'closure_date',
+       'principal_amount', 'total_loan_amount', 'interest_rate',
+       'interest_period', 'FEE', 'percent_Fee', 'Importe Principal', 'Interes',
+       'Ganancia Total', 'principal_outstanding', 'interest_outstanding',
+       'days_past_due', 'collateral_description', 'collateral_value',
+       'restructured_id', 'renewed_id', 'ZONA', 'ltv',
+       'capital_soles al momento del castigo', 'fecha_castigo',
+       'pagos_recuperados', 'proporcional_monto_cancelacion',
+       'proporcional_monto_cancelacion_legal', 'recuperacion_legal',
+       ]]
+
+monto_contract = monto_contract[monto_contract['contract_id'].isin(list(loans['contract_id']))]
+
 #%%
 '''
 # Guardar en un mismo Excel con varias hojas
@@ -588,15 +637,15 @@ if crear_excel == True:
         mode="a",                       # append en vez de sobrescribir
         if_sheet_exists="replace"       # o "new" para crear nueva hoja aunque el nombre coincida
     ) as writer:
-        loans.to_excel(writer,       sheet_name="Loans File",               index = False)
-        individuals.to_excel(writer, sheet_name="Individual Loan Checks",   index = False)
-        repayments.to_excel(writer,  sheet_name="Repayment Schedules File", index = False)
-        payments.to_excel(writer,    sheet_name="Payments File",            index = False)
-        aggregate_checks.to_excel(writer, sheet_name="agg checks",          index = False)
-        vintage_30.to_excel(writer,  sheet_name="Vintage Default 30",       index = False)
-        vintage_60.to_excel(writer,  sheet_name="Vintage Default 60",       index = False)
-        vintage_90.to_excel(writer,  sheet_name="Vintage Default 90",       index = False)
-
+        loans.to_excel(writer,            sheet_name="Loans File",               index = False)
+        individuals.to_excel(writer,      sheet_name="Individual Loan Checks",   index = False)
+        repayments.to_excel(writer,       sheet_name="Repayment Schedules File", index = False)
+        payments.to_excel(writer,         sheet_name="Payments File",            index = False)
+        aggregate_checks.to_excel(writer, sheet_name="agg checks",               index = False)
+        vintage_30.to_excel(writer,       sheet_name="Vintage Default 30",       index = False)
+        vintage_60.to_excel(writer,       sheet_name="Vintage Default 60",       index = False)
+        vintage_90.to_excel(writer,       sheet_name="Vintage Default 90",       index = False)
+        monto_contract.to_excel(writer,   sheet_name="contract_loan_amount_PEN", index = False)
     print('excel creado')
 
 #%%

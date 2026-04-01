@@ -23,8 +23,8 @@ import warnings
 warnings.filterwarnings("ignore")
 
 #%%
-fecha_ = pd.Timestamp('2026-03-01') #yyyy-mm-dd
-limit_ = pd.Timestamp('2026-03-07')
+fecha_ = pd.Timestamp('2026-03-16') #yyyy-mm-dd
+limit_ = pd.Timestamp('2026-03-21')
 ubicacion = r'C:\Users\Joseph Montoya\Desktop\pruebas\redencion de facturas'
 
 #%% Credenciales de AmazonAthena
@@ -377,5 +377,8 @@ os.chdir(ubicacion)
 df_final.to_excel(f'RM-RD {str(fecha_)[0:10]}.xlsx', index = False)
 
 #%%
+
+print(ubicacion)
+print('')
 print('fin')
 

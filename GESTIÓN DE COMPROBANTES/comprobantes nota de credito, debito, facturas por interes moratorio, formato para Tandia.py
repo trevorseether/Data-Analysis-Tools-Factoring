@@ -45,7 +45,7 @@ col_comprobante_emitido = 'COMPROBANTE EMITIDO'  #'Comprobante Emitido'
 df_emitidos = df_emitidos[~(df_emitidos[col_factura_relacionada].isna() & df_emitidos[col_comprobante_emitido].isna() & df_emitidos['RUC'].isna())]
 
 facturas_emitidas = df_emitidos[ df_emitidos['TIPO DE COMPROBANTE'] == 'FACTURA' ]
-df_emitidos = df_emitidos[df_emitidos['TIPO DE COMPROBANTE'].str.contains('NOTA DE')]
+df_emitidos = df_emitidos[df_emitidos['TIPO DE COMPROBANTE'].str.contains('NOTA DE', na = False)]
 
 # ops_incluir = ['X4YZ5vPn', 'BrXeVM9f', 'sI4maSsU', 'pFAxsyvk', 'gWYRarEL', 'TMRsoS7z', '77rF90pd', '42U8nGPa']
 # com_vinculado = ['F002-29938', 'F002-30510', 'F002-31318', 'F002-31352', 'F002-25643', 'F002-27005', 'F002-29147', '']
@@ -73,9 +73,9 @@ df_online['RUC PROVEEDOR'] = (
     .str.replace('.0',  '', regex=False))
 
 #%% calculo del 'SALDO POR COSTO DE FINANCIAMIENTO RECALCULADO'
-df_online['Costo de Financiamiento Liquidado emp'] = df_online['Costo de Financiamiento Liquidado emp'].astype(str)
-df_online['Costo de Financiamiento Liquidado emp'] = df_online['Costo de Financiamiento Liquidado emp'].replace('nan', '')
-df_online = df_online[df_online['Costo de Financiamiento Liquidado emp'] == '']
+df_online['Costo de Financiamiento Liquidado emp'] = df_online['Costo de Financiamiento Liquidado emp'].astype(str).fillna('')
+df_online = df_online[df_online['Costo de Financiamiento Liquidado emp'].isin(['', 'nan'])]
+df_online['Costo de Financiamiento Liquidado emp'] = ''
 
 df_online['Costo de Financiamiento Liquidado emp(numérico)'] = df_online['Costo de Financiamiento Liquidado emp(numérico)'].astype(float)
 df_online = df_online[~pd.isna(df_online['Costo de Financiamiento Liquidado emp'])]
@@ -259,6 +259,7 @@ with pd.ExcelWriter(ubi + f'\\Carga_masiva_Facturas {hoy_formateado}.xlsx', engi
     df_int_mo.to_excel(writer, index=False, sheet_name='Comprobantes')
     df_int_items.to_excel(writer, index=False, sheet_name='Items')
 
-
+#%%
+print('fin')
 
 
