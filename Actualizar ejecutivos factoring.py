@@ -20,7 +20,7 @@ import io
 from pyathena import connect
 
 #%% mes a actualizar
-codmes = '2026-03-31' # formato YYYY-MM-DD
+codmes = '2026-04-30' # formato YYYY-MM-DD
 
 #%% Credenciales de AmazonAthena
 with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
@@ -156,6 +156,8 @@ s3.put_object(
 print(f"✅ Archivo subido a s3://{bucket_name}{s3_key}")
 print('')
 print(f'cargado el mes {codmes}')
+print('prod_datalake_sandbox.ba__fac_ejecutivos ')
+print('')
 
 #%%
 if duplicados.shape[0]:
