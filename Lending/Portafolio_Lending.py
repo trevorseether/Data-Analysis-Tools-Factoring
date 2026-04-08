@@ -23,7 +23,7 @@ import io
 from pyathena import connect
 
 #%%
-fecha_corte = '2026-02-28' # YYYY-MM-DD
+fecha_corte = '2026-03-31' # YYYY-MM-DD
 crear_excels = True # True o False
 
 #%% Credenciales de AmazonAthena
@@ -77,6 +77,7 @@ bd_pagos = pd.read_excel(r'G:/Mi unidad/BD_Cobranzas.xlsm',
                                    'RUC'                       : str,
                                    'Fecha de pago del cliente' : str}
                          )
+bd_pagos = bd_pagos.dropna(subset=['Codigo de prestamo', 'Numero de documento', 'Moneda'], how='all')
 
 bd_pagos['TOTAL DE LA CUOTA PAGADA'] = bd_pagos['TOTAL DE LA CUOTA PAGADA'].fillna(0).astype(float)
 bd_pagos['Capital pagado']     = bd_pagos['Capital pagado'].fillna(0).astype(float)
