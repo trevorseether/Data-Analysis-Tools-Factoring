@@ -220,7 +220,7 @@ hubspots.to_excel(r'C:\Users\Joseph Montoya\Desktop\pruebas\tipo financiamiento 
 import pandas as pd
 
 # cartera
-data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202602) 11-03-2026.xlsx',
+data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA portafolio factoring (202603) 10-04-2026.xlsx',
                      usecols=['Codigo de Subasta',
                                  'fecha_cierre',
                                  'Cierre',
@@ -233,7 +233,7 @@ data = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEg
 data['Codigo de Subasta'] = data['Codigo de Subasta'].str.lower()
 
 # cosecha propia
-cosecha = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA cosecha factoring (202602) 11-03-2026.xlsx')
+cosecha = pd.read_excel(r'G:/.shortcut-targets-by-id/1alT0hxGsi0dfv0NYh_LB4NrT2tKEgPK8/Cierre Factoring/Reportes/Inputs/DATA cosecha factoring (202603) 10-04-2026.xlsx')
 cosecha['Codigo de Subasta'] = cosecha['Codigo de Subasta'].str.lower()
 
 # proporciones antiguo:
