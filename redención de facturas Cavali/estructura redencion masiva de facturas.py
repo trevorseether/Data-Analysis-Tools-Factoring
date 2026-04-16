@@ -24,7 +24,7 @@ warnings.filterwarnings("ignore")
 
 #%%
 fecha_ = pd.Timestamp('2026-03-22') #yyyy-mm-dd
-limit_ = pd.Timestamp('2026-03-31')
+limit_ = pd.Timestamp('2026-04-08')
 ubicacion = r'C:\Users\Joseph Montoya\Desktop\pruebas\redencion de facturas'
 
 #%% Credenciales de AmazonAthena
