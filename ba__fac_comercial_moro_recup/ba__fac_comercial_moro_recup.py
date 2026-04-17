@@ -167,6 +167,7 @@ s3.put_object(
 )
 
 print(f"✅ Archivo subido a s3://{bucket_name}{s3_key}")
+print('prod_datalake_sandbox.ba__fac_comercial_moro_recup')
 
 print(5)
 #%%
