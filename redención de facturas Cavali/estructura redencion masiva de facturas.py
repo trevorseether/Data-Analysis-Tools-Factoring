@@ -271,6 +271,7 @@ df = df.merge(fecha_cierre,
 print(df.shape)
 ###### complementando información de cierre final de la operación (momento en que se pague la subasta)
 query = """
+
 SELECT
     hs_object_id,
     subject,
