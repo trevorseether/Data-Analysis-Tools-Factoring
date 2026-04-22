@@ -22,7 +22,7 @@ fecha_escritura = datetime.now(peru_tz).strftime('%Y-%m-%d')
 
 #%%
 crear_excel = True # crear excel, True o False
-cargar_lake = False # cargar al lake, True o False
+cargar_lake = True # cargar al lake, True o False
 cierre = '202602'
 os.chdir(rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} existing')
 
@@ -164,7 +164,7 @@ e4 = """.=CONTAR.SI.CONJUNTO('Loans File'!H:H;"<>CLOSED";'Loans File'!AC:AC;">"&
 e5 = """.=SUMA('Individual Loan Checks'!H:H)"""
 e6 = """.=SUMA('Individual Loan Checks'!D:D)"""
 e7 = """.=SUMA('Individual Loan Checks'!I:I)"""
-e8 = """.=SUMAR.SI.CONJUNTO('Loans File'!AB:AB;'Loans File'!H:H;"CURRENT";'Loans File'!AA:AA;">0")"""
+e8 = """.=SUMAR.SI.CONJUNTO('Loans File'!AB:AB;'Loans File'!H:H;"CURRENT";'Loans File'!AB:AB;">0")"""
 e9 = ''
 e10= ''
 
@@ -388,10 +388,13 @@ column_names = [desc[0] for desc in cursor.description]
 portafolio = pd.DataFrame(resultados, columns = column_names)
 portafolio['begin_date'] = pd.to_datetime(portafolio['begin_date'])
 portafolio['mes_desembolso'] = portafolio['begin_date'] + pd.offsets.MonthEnd(0)
+portafolio['cierre'] = portafolio['cierre'].astype(int)
+portafolio = portafolio[ portafolio['cierre'] <= int(cierre)]
 
 ########### obteniendo el monto desembolsado a nivel de contract_id para ltv
 monto_contract = portafolio[portafolio['q_desembolsado'] == 1]
 monto_contract['cierre'] = monto_contract['cierre'].astype(int)
+
 min_cierre = monto_contract.pivot_table(values  = 'cierre',
                                         index   = 'contract_id',
                                         aggfunc = 'min').reset_index()
@@ -406,6 +409,8 @@ monto_contract = monto_contract.pivot_table(values  = 'loan_amount_soles',  #'lo
 
 ##### parentesis para colocar el saldo al momento del castigo #################
 portafolio['fecha_cierre'] = pd.to_datetime(portafolio['fecha_cierre'])
+portafolio_original = portafolio.copy()
+
 castigos = fechas_castigo.merge(portafolio[['loan_id', 'contract_id', 'cierre', 'capital_soles']],
                                 on  = ['contract_id', 'cierre'],
                                 how = 'left')
@@ -485,6 +490,34 @@ loans['pagos_recuperados'] = '''.=SUMAR.SI.CONJUNTO(
 'Payments File'!C:C;">="&'Loans File'!AK2
 )
 '''
+
+#%% calculando tablas extras (cartera + par 30, 60, 90)
+portafolio_original_2021 = portafolio_original[portafolio_original['cierre'] >= 202101]
+portafolio_original_2021 = portafolio_original_2021[portafolio_original_2021['status'] == 'VIGENTE']
+
+columnas = ['capital_soles', 'capital_30d', 'capital_60d', 'capital_90d']
+df_saldo_mora = portafolio_original_2021.pivot_table(values = columnas,
+                                                   index    = 'cierre',
+                                                   aggfunc  = 'sum').reset_index()
+df_saldo_mora['%PAR30'] = df_saldo_mora['capital_30d']/df_saldo_mora['capital_soles']
+df_saldo_mora['%PAR60'] = df_saldo_mora['capital_60d']/df_saldo_mora['capital_soles']
+df_saldo_mora['%PAR90'] = df_saldo_mora['capital_90d']/df_saldo_mora['capital_soles']
+
+df_transpuesto = (df_saldo_mora.set_index('cierre')   # columnas serán los cierres
+                                .T                     # transpose
+                                .reset_index()
+                                .rename(columns={'index': 'metric'}))
+orden = ['capital_soles', 'capital_30d', 'capital_60d', 'capital_90d', '%PAR30', '%PAR60', '%PAR90']
+df_transpuesto = df_transpuesto.set_index('metric').loc[orden].reset_index()
+
+# CALCULANDO MONTO_PROVISION
+
+monto_provision = portafolio_original_2021.pivot_table(values  = 'monto_provision',
+                                                       columns = 'cierre',
+                                                       aggfunc = 'sum').reset_index()
+monto_provision.rename(columns={'index': 'metric'}, inplace=True)
+
+df_saldo_cierre_vencido_provisiones = pd.concat([df_transpuesto, monto_provision], ignore_index=True)
 
 #%% añadiendo las recuperaciones de diego cordoba
 recup = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/Recuperaciones - Diego Cordova.xlsx',
@@ -641,11 +674,12 @@ if crear_excel == True:
         individuals.to_excel(writer,      sheet_name="Individual Loan Checks",   index = False)
         repayments.to_excel(writer,       sheet_name="Repayment Schedules File", index = False)
         payments.to_excel(writer,         sheet_name="Payments File",            index = False)
-        aggregate_checks.to_excel(writer, sheet_name="agg checks",               index = False)
         vintage_30.to_excel(writer,       sheet_name="Vintage Default 30",       index = False)
         vintage_60.to_excel(writer,       sheet_name="Vintage Default 60",       index = False)
         vintage_90.to_excel(writer,       sheet_name="Vintage Default 90",       index = False)
         monto_contract.to_excel(writer,   sheet_name="contract_loan_amount_PEN", index = False)
+        df_saldo_cierre_vencido_provisiones.to_excel(writer,   sheet_name="Evolition outstanding", index = False)
+        aggregate_checks.to_excel(writer, sheet_name="agg checks",               index = False)
     print('excel creado')
 
 #%%

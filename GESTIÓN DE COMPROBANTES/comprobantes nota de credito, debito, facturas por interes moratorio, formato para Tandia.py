@@ -96,7 +96,6 @@ df = df_online.merge(df_emitidos[[col_factura_relacionada, col_comprobante_emiti
                       left_on  = 'Comprobante_costo_financiamiento',
                       right_on = col_factura_relacionada,
                       how = 'left')
-
 filtrado = df[ pd.isna(df [col_comprobante_emitido])]
 
 filtrado = filtrado[ ~filtrado['Comprobante_costo_financiamiento'].isin(list(df_emitidos[col_factura_relacionada] )) ]
