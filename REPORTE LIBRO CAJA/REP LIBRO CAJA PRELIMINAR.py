@@ -52,12 +52,12 @@ def proceso_completo(ubi, nombre_archivo, tc, sheets_objetivo):
             ruta = os.path.join(ubi, archivo)
             xls = pd.ExcelFile(ruta)
     
-            # sheets_validos = [
-            #         s for s in sheets_objetivo
-            #         if s.strip() in [x.strip() for x in xls.sheet_names]
-            #     ]
-            sheet_map = {s.strip().upper(): s for s in xls.sheet_names}
-            sheets_validos = list(sheet_map.values())
+            sheets_validos = [
+                    s for s in sheets_objetivo
+                    if s.strip() in [x.strip() for x in xls.sheet_names]
+                ]
+            # sheet_map = {s.strip().upper(): s for s in xls.sheet_names}
+            # sheets_validos = list(sheet_map.values())
     
             for sheet in sheets_validos:
     
@@ -202,13 +202,13 @@ proceso_completo(ubi, nombre_archivo, tc, sheets_objetivo)
 "PROCESO PARA CS"
 ubi            = r'C:\Users\Joseph Montoya\Desktop\REPORTE LIBRO CAJA\REPORTE CS'
 nombre_archivo = 'Reporte CS'
-sheets_objetivo = ['BCP MN TRADER', 'BCP ME TRADER', 'BCP MN ADMIN', 'BCP ME ADMIN', 'IBK MN', 'IBK ME', 'Ban Bif MN', 'Ban Bif ME', 'PICHINCHA MN', 'PICHINCHA ME']
+sheets_objetivo = ['BCP MN ADMIN', 'BCP ME ADMIN']
 proceso_completo(ubi, nombre_archivo, tc, sheets_objetivo)
 ###############################################################################
 "PROCESO PARA FP"
 ubi            = r'C:\Users\Joseph Montoya\Desktop\REPORTE LIBRO CAJA\REPORTE FP'
 nombre_archivo = 'Reporte FP'
-sheets_objetivo = ['BCP AHORROS MN', 'BCP AHORROS ME', 'BCP MN ADMIN ', 'BCP ME ADMIN']
+sheets_objetivo = ['BCP AHORROS MN', 'BCP AHORROS ME', 'BCP MN ADMIN', 'BCP ME ADMIN']
 proceso_completo(ubi, nombre_archivo, tc, sheets_objetivo)
 ###############################################################################
 "PROCESO PARA P2P"
@@ -220,7 +220,7 @@ proceso_completo(ubi, nombre_archivo, tc, sheets_objetivo)
 "PROCESO PARA TANDIA"
 ubi            = r'C:\Users\Joseph Montoya\Desktop\REPORTE LIBRO CAJA\REPORTE TANDIA'
 nombre_archivo = 'Reporte Tandia'
-sheets_objetivo = ['BCP MN', 'BCP ME', 'BCP MN REC', 'BCP ME REC', 'BBVA MN', 'BBVA ME', 'IBK ME', 'IBK MN']
+sheets_objetivo = ['BCP MN', 'BCP ME']
 proceso_completo(ubi, nombre_archivo, tc, sheets_objetivo)
 ###############################################################################
 
