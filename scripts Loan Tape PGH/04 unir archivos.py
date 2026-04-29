@@ -16,14 +16,14 @@ from datetime import datetime, timezone, timedelta
 peru_tz = timezone(timedelta(hours=-5))
 today_date = datetime.now(peru_tz).strftime('%Y%m%d')
 
-today_date = '20260320'
+today_date = '20260423'
 
 fecha_escritura = datetime.now(peru_tz).strftime('%Y-%m-%d')
 
 #%%
 crear_excel = True # crear excel, True o False
 cargar_lake = True # cargar al lake, True o False
-cierre = '202602'
+cierre = '202603'
 os.chdir(rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} existing')
 
 path_new      = rf'C:\Users\Joseph Montoya\Desktop\LoanTape_PGH\temp\{cierre} news'
@@ -491,6 +491,7 @@ loans['pagos_recuperados'] = '''.=SUMAR.SI.CONJUNTO(
 )
 '''
 
+
 #%% calculando tablas extras (cartera + par 30, 60, 90)
 portafolio_original_2021 = portafolio_original[portafolio_original['cierre'] >= 202101]
 portafolio_original_2021 = portafolio_original_2021[portafolio_original_2021['status'] == 'VIGENTE']
@@ -518,6 +519,31 @@ monto_provision = portafolio_original_2021.pivot_table(values  = 'monto_provisio
 monto_provision.rename(columns={'index': 'metric'}, inplace=True)
 
 df_saldo_cierre_vencido_provisiones = pd.concat([df_transpuesto, monto_provision], ignore_index=True)
+
+# CALCULANDO REPROGRAMADOS
+df_reprogramados = portafolio_original_2021[portafolio_original_2021['loan_type'].str.upper().str.strip()== 'RESTRUCTURACION']
+df_reprogramados.rename(columns={'capital_soles': 'capital_soles_reprogramado'}, inplace=True)
+
+df_reprogramados = df_reprogramados.pivot_table(values  = 'capital_soles_reprogramado',
+                                                columns = 'cierre',
+                                                aggfunc = 'sum').reset_index()
+df_reprogramados.rename(columns={'index': 'metric'}, inplace=True)
+
+df_saldo_cierre_vencido_provisiones = pd.concat([df_saldo_cierre_vencido_provisiones, df_reprogramados], ignore_index=True)
+
+# CALCULANDO REFINANCIADO
+df_ref = portafolio_original_2021[portafolio_original_2021['situacion_del_credito'].str.upper().str.strip()== 'REF']
+df_ref.rename(columns={'capital_soles': 'capital_soles_refinanciado'}, inplace=True)
+
+df_ref = df_ref.pivot_table(values  = 'capital_soles_refinanciado',
+                            columns = 'cierre',
+                            aggfunc = 'sum').reset_index()
+df_ref.rename(columns={'index': 'metric'}, inplace=True)
+
+df_saldo_cierre_vencido_provisiones = pd.concat([df_saldo_cierre_vencido_provisiones, df_ref], ignore_index=True)
+
+
+
 
 #%% añadiendo las recuperaciones de diego cordoba
 recup = pd.read_excel(r'C:/Users/Joseph Montoya/Desktop/LoanTape_PGH/Recuperaciones - Diego Cordova.xlsx',
@@ -614,6 +640,8 @@ loans = loans.merge(castigos_bd_pagos,
                     on  = 'loan_id',
                     how = 'left')
 
+
+
 #%% añadiendo contract_id al loans
 
 loans = loans.merge(df_cods[['loan_id', 'contract_id']],
@@ -625,6 +653,27 @@ loans = loans[loans['contract_id'].notna()]
 
 # reemplazo de valores puntuales
 loans.loc[(loans['contract_id'] == 'P00012'),'collateral_value'] = 270000
+
+#%% flag_lendable
+
+list_lentable = ['P02175',
+                        'P02483',
+                        'P02639',
+                        'P02677',
+                        'P02733',
+                        'P02773',
+                        'P02791',
+                        'P02809',
+                        'P02949',
+                        'P03045',
+                        'P03049',
+                        'P03501',
+                        'P03570',
+                        'P03419']
+
+loans['flag_lendable'] = np.where(loans['contract_id'].isin(list_lentable),
+                                  'True',
+                                  '')
 
 # ordenamiento
 loans = loans[['loan_id', 'contract_id', 'customer_id', 'customer_birth_year', 'customer_gender',
@@ -639,6 +688,7 @@ loans = loans[['loan_id', 'contract_id', 'customer_id', 'customer_birth_year', '
        'capital_soles al momento del castigo', 'fecha_castigo',
        'pagos_recuperados', 'proporcional_monto_cancelacion',
        'proporcional_monto_cancelacion_legal', 'recuperacion_legal',
+       'flag_lendable',
        ]]
 
 monto_contract = monto_contract[monto_contract['contract_id'].isin(list(loans['contract_id']))]
@@ -678,7 +728,7 @@ if crear_excel == True:
         vintage_60.to_excel(writer,       sheet_name="Vintage Default 60",       index = False)
         vintage_90.to_excel(writer,       sheet_name="Vintage Default 90",       index = False)
         monto_contract.to_excel(writer,   sheet_name="contract_loan_amount_PEN", index = False)
-        df_saldo_cierre_vencido_provisiones.to_excel(writer,   sheet_name="Evolition outstanding", index = False)
+        df_saldo_cierre_vencido_provisiones.to_excel(writer,   sheet_name="Evolution outstanding", index = False)
         aggregate_checks.to_excel(writer, sheet_name="agg checks",               index = False)
     print('excel creado')
 
@@ -697,12 +747,12 @@ if cargar_lake == True:
     loans['principal_remaining']    = ''
     loans['fee_outstanding']        = ''
     loans['penalty_outstanding']    = ''
-    loans['is_pledged_to_lendable'] = ''
+    loans['is_pledged_to_lendable'] = loans['flag_lendable']
     loans_s3 = loans[['loan_id','customer_id','customer_birth_year','customer_gender','customer_sector','branch','status',
                         'product','currency','asset_product','loan_purpose','begin_date','maturity_date','original_maturity_date','closure_date',
                         'principal_amount','total_loan_amount','interest_rate','interest_period','downpayment','fees','principal_remaining',
                         'principal_outstanding','interest_outstanding','fee_outstanding','penalty_outstanding','days_past_due','collateral_description',
-                        'collateral_value','restructured_id','renewed_id','is_pledged_to_lendable',]]
+                        'collateral_value','restructured_id','renewed_id','is_pledged_to_lendable']]
     
     schedules_s3 = repayments[['loan_id','due_date','amount','principal_amount',
                                'interest_amount','fee_amount','paid_date',]]

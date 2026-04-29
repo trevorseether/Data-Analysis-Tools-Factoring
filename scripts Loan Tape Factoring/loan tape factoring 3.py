@@ -960,8 +960,16 @@ del df['code']
 
 #%% calculo del DPD BUCKETS
 query = ''' 
-select * from prod_datalake_master.ba__fac_outstanding_monthly_snapshot
+select 
+    fo.*
+    ,p.promotion_warranty_applied 
 
+from prod_datalake_master.ba__fac_outstanding_monthly_snapshot as fo
+
+left join (select distinct code, promotion_warranty_applied from prod_datalake_analytics.fac_auctions
+where promotion_warranty_applied = True
+and status != 'canceled') as p
+on p.code = fo.code
 '''
 cursor = conn.cursor()
 cursor.execute(query)
@@ -1026,6 +1034,16 @@ dpd_analysis['% current'] = dpd_analysis['current DPD 0'] / dpd_analysis['total 
 dpd_analysis['% DPD 1-30'] = (dpd_analysis['current DPD 1 - 7']+dpd_analysis['current DPD 8 - 14']+dpd_analysis['current DPD 15 - 30']) / dpd_analysis['total outstanding']
 dpd_analysis['% DPD 31-90'] = (dpd_analysis['current DPD 31 - 60']+dpd_analysis['current DPD 61 - 90']) / dpd_analysis['total outstanding']
 dpd_analysis['% DPD 90+'] = dpd_analysis['current DPD 90+'] / dpd_analysis['total outstanding']
+
+df_promotion_warranty_applied = df_portafolio[['code', 'promotion_warranty_applied']]
+df_promotion_warranty_applied = df_promotion_warranty_applied [df_promotion_warranty_applied ['promotion_warranty_applied'].astype(str) == 'True'] 
+df_promotion_warranty_applied = df_promotion_warranty_applied.drop_duplicates(subset = 'code', keep= 'first')
+df = df.merge(df_promotion_warranty_applied,
+              left_on  = 'loan_id',
+              right_on = 'code',
+              how      = 'left')
+del df['code']
+df['promotion_warranty_applied'] = df['promotion_warranty_applied'].fillna('')
 
 #%% cálculo de default acumulado 2021 - 2025 par 30 en febrero 2026
 def_acum = df_portafolio[df_portafolio['q_desembolso'] == 1].pivot_table(index  = 'codmes_transfer',
@@ -1118,7 +1136,7 @@ if upload_s3 == True:
                     'downpayment','fees','principal_remaining','principal_outstanding',
                     'interest_outstanding','fee_outstanding','penalty_outstanding',
                     'days_past_due','collateral_description','collateral_value',
-                    'restructured_id','renewed_id','is_pledged_to_lendable',]]
+                    'restructured_id','renewed_id','is_pledged_to_lendable','promotion_warranty_applied']]
     
     ######## hoja factoring? ######################################################
     df['interest_amount'] = ''
@@ -1128,7 +1146,7 @@ if upload_s3 == True:
                         'closure_date','currency','principal_amount','total_loan_amount','interest_rate',
                         'interest_period','downpayment','fees','warranty','interest_amount','principal_remaining',
                         'principal_outstanding','interest_outstanding','fee_outstanding','penalty_outstanding',
-                        'days_past_due','collateral_description','collateral_value','is_pledged_to_lendable',]]
+                        'days_past_due','collateral_description','collateral_value','is_pledged_to_lendable','promotion_warranty_applied']]
     
     ######## hoja schedules #######################################################
     fee_amount = df[['loan_id', 'Structuring Fee']]
