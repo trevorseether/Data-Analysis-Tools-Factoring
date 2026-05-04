@@ -20,7 +20,7 @@ warnings.filterwarnings("ignore")
 ubi = r'C:\Users\Joseph Montoya\Desktop\notas de crédito y débito'
 
 #%%
-archivo = 'G:/Mi unidad/Pagados 122024 en adelante.xlsx'
+archivo = 'G:/Mi unidad/Gestión de Comprobantes Factoring.xlsx'
 
 df_online = pd.read_excel( archivo,
                            sheet_name = 'Online',
