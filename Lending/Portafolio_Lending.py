@@ -23,7 +23,7 @@ import io
 from pyathena import connect
 
 #%%
-fecha_corte = '2026-03-31' # YYYY-MM-DD
+fecha_corte = '2026-04-30' # YYYY-MM-DD
 crear_excels = True # True o False
 
 #%% Credenciales de AmazonAthena
@@ -156,7 +156,7 @@ del df_monthly_snapshot['_timestamp']
 bd_pagos['flag_finalizado'] = (
     bd_pagos
     .groupby('Codigo de prestamo')['Status de cuota']
-    .transform(lambda x: (x == 'FINALIZADO').all())
+    .transform(lambda x: ((x == 'FINALIZADO')).all())
 )
 # obtenemos solo las ops finalizadas
 bd_pagos_finalizados = bd_pagos[bd_pagos['flag_finalizado'] == True]
