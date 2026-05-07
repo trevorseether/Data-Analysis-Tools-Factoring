@@ -6,14 +6,14 @@ Created on Wed Apr 23 15:28:45 2025
 """
 
 import pandas as pd
-import requests
-from io import BytesIO
+# import requests
+# from io import BytesIO
 # import numpy as np
 # import boto3
 from pyathena import connect
 # import openpyxl
-from openpyxl import load_workbook
-from openpyxl.styles import NamedStyle
+# from openpyxl import load_workbook
+# from openpyxl.styles import NamedStyle
 import os
 
 import shutil
