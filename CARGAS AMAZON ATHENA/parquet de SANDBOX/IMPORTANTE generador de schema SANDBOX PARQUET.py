@@ -15,7 +15,7 @@ ubicacion = r'C:/Users/Joseph Montoya/Downloads/Ejecutivos-BI de líneas.xlsx'
 
 
 df = pd.read_excel(io = ubicacion,
-                             sheet_name = 'Ejecutivo',
+                             sheet_name = 'Pagina',
                              dtype = str)
 
 #%%
@@ -30,7 +30,7 @@ df["_timestamp"] = now - timedelta(hours=5)
 
 #%% 
 # pip install pyarrow
-df.to_parquet(r'C:/Users/Joseph Montoya/Desktop/solicitud antonella/fac_line_executives.parquet',
+df.to_parquet(r'C:/Users/Joseph Montoya/Desktop/solicitud antonella/fac_line_page.parquet',
                  index = False,
                  )
 
@@ -43,7 +43,7 @@ nombre_carpeta = nombre_parquet
 df = pd.read_parquet(r'C:/Users/Joseph Montoya/Desktop/solicitud antonella/fac_line_executives.parquet')
 
 #%%
-nombre_parquet = 'fac_line_executives'
+nombre_parquet = 'fac_line_page'
 nombre_carpeta = nombre_parquet
 
 mapping_types = {
