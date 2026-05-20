@@ -21,7 +21,7 @@ import io
 from pyathena import connect
 
 #%% mes para insertar
-codmes = '2026-03-31'
+codmes = '2026-04-30'
 
 #%% Credenciales de AmazonAthena
 with open(r"C:/Users/Joseph Montoya/Desktop/credenciales actualizado.txt") as f:
@@ -48,7 +48,9 @@ athena = boto3.client(
 
 # ID de la query guardada (lo ves en la URL de Athena)
 # nombre: Base_Morosidad_Recuperacion_Factoring.rmacuri
-named_query_id = "51eb3903-f7b6-4b2c-a527-c35765e74134"
+# named_query_id = "51eb3903-f7b6-4b2c-a527-c35765e74134"
+named_query_id = "eeb22c50-dbf3-4d84-9776-459c56fb671d"
+
 
 # # Obtener SQL
 # response = athena.get_named_query(NamedQueryId=named_query_id)

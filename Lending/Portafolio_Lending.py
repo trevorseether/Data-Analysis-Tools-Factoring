@@ -39,7 +39,7 @@ conn = connect(
     )
 
 #%% ops
-df_ops = pd.read_excel(r'G:/Mi unidad/BD_Cobranzas.xlsm',
+df_ops = pd.read_excel(r'G:/Mi unidad/BD_Operaciones y cobranzas.xlsm',
                        sheet_name= 'Prestamos gestionados',
                             dtype= {'Numero de documento'         : str,
                                     'RUC'                         : str,
@@ -70,6 +70,9 @@ df_ops = df_ops.dropna(subset=['fecha_de_desembolso', 'moneda'])
 df_ops['nro_de_cuotas'] = df_ops['nro_de_cuotas'].astype(int)
 df_ops['dias_de_mora'] = df_ops['dias_de_mora'].fillna(0).astype(int)
 
+import os
+os.chdir(r'C:\Users\Joseph Montoya\Desktop\pruebas')
+df_ops.to_excel('asdasd.xlsx')
 ###############################################################################
 bd_pagos = pd.read_excel(r'G:/Mi unidad/BD_Cobranzas.xlsm',
                          sheet_name = 'BD PAGOS',

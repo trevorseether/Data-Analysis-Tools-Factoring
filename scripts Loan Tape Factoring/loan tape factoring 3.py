@@ -25,7 +25,7 @@ hoy_formateado = datetime.today().strftime('%Y-%m-%d')
 
 #%%
 
-cierre = 202603
+cierre = 202604
 
 ubi = rf'C:\Users\Joseph Montoya\Desktop\loans tape\{cierre}' # se creará automáticamente
 

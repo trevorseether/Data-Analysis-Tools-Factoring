@@ -23,8 +23,8 @@ import warnings
 warnings.filterwarnings("ignore")
 
 #%%
-fecha_ = pd.Timestamp('2026-03-22') #yyyy-mm-dd
-limit_ = pd.Timestamp('2026-04-08')
+fecha_ = pd.Timestamp('2026-04-08') #yyyy-mm-dd
+limit_ = pd.Timestamp('2026-04-15')
 ubicacion = r'C:\Users\Joseph Montoya\Desktop\pruebas\redencion de facturas'
 
 #%% Credenciales de AmazonAthena
@@ -79,7 +79,7 @@ select * from onlines
 union all
 select * from offlines where dealname not in (select code from onlines)
 
-)
+), tabla_final as (
 
 select 
     u.*,
@@ -96,6 +96,14 @@ from unidos as u
 left join prod_datalake_analytics.fac_requests as fr on u.code = fr.code
 left join (select * from prod_datalake_master.hubspot__deal where pipeline = '14026011' and facturas is not null and lower(tipificacion_operativa)= 'adelanto' AND DEALSTAGE not in ('14026018','14026016')) as hd on hd.dealname = u.code
 
+where u.code in (select subject from prod_datalake_master.hubspot__ticket where tipo_de_pago = 'Finalizado')
+or u.code in (  select fr.code from prod_datalake_analytics.fac_client_payments as fcp
+                left join prod_datalake_analytics.fac_requests as fr
+                on fcp.request_id = fr._id
+                where fcp.status = 'finalizado'
+                and fr.code not un ('rejected', 'canceled'))
+)
+select * from tabla_final
 
 '''
 
@@ -281,6 +289,7 @@ SELECT
     hs_pipeline
 FROM prod_datalake_master.hubspot__ticket    --- según cobranzas, esta es la fecha en la que el deudor termina de pagar
 WHERE hs_pipeline = '26417284'  --- cobranzas factoring/confirming
+AND tipo_de_pago != 'Comprado'
 
 """
 cursor = conn.cursor()

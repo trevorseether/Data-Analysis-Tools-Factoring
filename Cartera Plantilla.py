@@ -48,24 +48,35 @@ query = """
 
 SELECT 
   CAST(
-    date_trunc('month', date_add('month', 1, fecha_cierre)) - interval '1' day 
+    date_trunc('month', date_add('month', 1, CAST(fecha_cierre AS date))) 
+    - INTERVAL '1' day
     AS date
   ) AS fecha_cierre_corregido,
 
   CAST(
-    date_trunc('month', date_add('month', 1, transfer_date)) - interval '1' day 
+    date_trunc('month', date_add('month', 1, CAST(transfer_date AS date))) 
+    - INTERVAL '1' day
     AS date
   ) AS fecha_desembolso,
 
   CASE 
-    WHEN CAST(date_trunc('month', date_add('month', 1, fecha_cierre)) - interval '1' day AS date) = 
-         CAST(date_trunc('month', date_add('month', 1, transfer_date)) - interval '1' day AS date)
+    WHEN CAST(
+           date_trunc('month', date_add('month', 1, CAST(fecha_cierre AS date)))
+           - INTERVAL '1' day
+           AS date
+         )
+       =
+         CAST(
+           date_trunc('month', date_add('month', 1, CAST(transfer_date AS date)))
+           - INTERVAL '1' day
+           AS date
+         )
     THEN 'desembolsado en el mes'
     ELSE ''
   END AS "desembolsado flag",
 
   *
-FROM prod_datalake_analytics.fac_outstanding;
+FROM prod_datalake_master."ba__fac_outstanding_monthly_snapshot";
 
 """
 cursor = conn.cursor()
@@ -88,7 +99,9 @@ orden_columnas = ['202012', '202101', '202102', '202103', '202104', '202105', '2
                   '202304', '202305', '202306', '202307', '202308', '202309', '202310',
                   '202311', '202312', '202401', '202402', '202403', '202404', '202405',
                   '202406', '202407', '202408', '202409', '202410', '202411', '202412',
-                  '202501', '202502', '202503', '202504', '202505']
+                  '202501', '202502', '202503', '202504', '202505', '202506', '202507',
+                  '202508', '202509', '202510', '202511', '202512', '202601', '202602',
+                  '202603', '202604',]
 orden_columnas = list(map(int, orden_columnas))
 
 # df_outstanding = df_outstanding[ df_outstanding['actual_status'] != 'finalizado' ]
@@ -280,11 +293,11 @@ desem3 = desembolsados.pivot_table(#columns = 'currency_auctions',
 
 #%%% nro de clientes y deudores por periodo
 hasta_enero_2025 = df_outstanding[ df_outstanding['codmes'] <= 202501]
-nro_cli = hasta_enero_2025.pivot_table(values  = 'client_ruc',
+nro_cli = hasta_enero_2025.pivot_table(values = 'client_ruc',
                                      columns = 'anio',
                                      aggfunc = 'nunique')
 
-nro_pro = hasta_enero_2025.pivot_table(values  = 'provider_ruc',
+nro_pro = hasta_enero_2025.pivot_table(values = 'provider_ruc',
                                      columns = 'anio',
                                      aggfunc = 'nunique')
 
@@ -294,14 +307,13 @@ nro_distintos.to_excel("cantidad de clientes y deudores por año.xlsx",
                        index = False)
 
 #%% plazo promedio de cartera
-df_outstanding['dias plazo'] = (df_outstanding['e_payment_date'] - df_outstanding['transfer_date']).dt.days
+df_outstanding['dias plazo'] = (pd.to_datetime(df_outstanding['e_payment_date']) - pd.to_datetime(df_outstanding['transfer_date'])).dt.days
 df_outstanding = df_outstanding[ df_outstanding['codmes'] <= 202501]
 promedio_plazo = df_outstanding.pivot_table(values  = 'dias plazo',
                                             index   = 'anio',
                                             aggfunc = 'mean')
 df_outstanding['transfer_date']
 df_outstanding['payment_date']
-
 df_outstanding['e_payment_date']
 
 #%% nro de facturas (cambias proceso, sacar del fac_requests LJ offline de hubspot)
